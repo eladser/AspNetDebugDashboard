@@ -170,7 +170,7 @@ public class DebugApiControllerTests
     public async Task Search_WithEmptyTerm_ReturnsBadRequest()
     {
         // Act
-        var result = await _controller.Search("", null);
+        var result = await _controller.Search("", Array.Empty<string>());
 
         // Assert
         result.Should().BeOfType<BadRequestObjectResult>();
