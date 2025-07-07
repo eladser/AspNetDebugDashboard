@@ -76,15 +76,6 @@ public class PagedResult<T>
     public bool HasPreviousPage => Page > 1;
 }
 
-public class HealthCheckResult
-{
-    public string Status { get; set; } = "Unknown";
-    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
-    public Dictionary<string, object> Details { get; set; } = new();
-    public TimeSpan? ResponseTime { get; set; }
-    public string? ErrorMessage { get; set; }
-}
-
 public class PerformanceMetrics
 {
     public int TotalRequests { get; set; }
