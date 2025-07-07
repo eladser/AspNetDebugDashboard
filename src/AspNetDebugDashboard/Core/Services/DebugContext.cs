@@ -62,7 +62,7 @@ public class DebugContext
     {
         if (_activeRequests.TryGetValue(requestId, out var request))
         {
-            request.Exception = exception;
+            request.Exception = exception.Message; // Convert to string
         }
     }
 }
