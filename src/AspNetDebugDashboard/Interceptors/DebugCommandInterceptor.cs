@@ -21,7 +21,7 @@ public class DebugCommandInterceptor : DbCommandInterceptor
         DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result,
         CancellationToken cancellationToken = default)
     {
-        await LogCommandAsync(command, eventData, "ExecuteReader");
+        LogCommand(command, eventData, "ExecuteReader");
         return await base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
     }
 
@@ -37,7 +37,7 @@ public class DebugCommandInterceptor : DbCommandInterceptor
         DbCommand command, CommandEventData eventData, InterceptionResult<int> result,
         CancellationToken cancellationToken = default)
     {
-        await LogCommandAsync(command, eventData, "ExecuteNonQuery");
+        LogCommand(command, eventData, "ExecuteNonQuery");
         return await base.NonQueryExecutingAsync(command, eventData, result, cancellationToken);
     }
 
@@ -53,7 +53,7 @@ public class DebugCommandInterceptor : DbCommandInterceptor
         DbCommand command, CommandEventData eventData, InterceptionResult<object> result,
         CancellationToken cancellationToken = default)
     {
-        await LogCommandAsync(command, eventData, "ExecuteScalar");
+        LogCommand(command, eventData, "ExecuteScalar");
         return await base.ScalarExecutingAsync(command, eventData, result, cancellationToken);
     }
 
@@ -72,7 +72,7 @@ public class DebugCommandInterceptor : DbCommandInterceptor
         await base.CommandFailedAsync(command, eventData, cancellationToken);
     }
 
-    private async Task LogCommandAsync(DbCommand command, CommandEventData eventData, string commandType)
+    private void LogCommand(DbCommand command, CommandEventData eventData, string commandType)
     {
         using var scope = _serviceProvider.CreateScope();
         var storage = scope.ServiceProvider.GetService<IDebugStorage>();
