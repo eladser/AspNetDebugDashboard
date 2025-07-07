@@ -13,7 +13,7 @@ builder.Services.AddSwaggerGen();
 // Add Entity Framework
 builder.Services.AddDbContext<SampleDbContext>(options =>
 {
-    options.UseInMemory("SampleDb");
+    options.UseInMemoryDatabase("SampleDb");
     // Add the debug dashboard interceptor
     options.AddDebugDashboard(builder.Services.BuildServiceProvider());
 });
