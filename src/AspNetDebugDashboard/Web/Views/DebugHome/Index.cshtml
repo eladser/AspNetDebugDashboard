@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        .debug-dashboard {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .code-block {
+            background: #1f2937;
+            color: #e5e7eb;
+            border-radius: 8px;
+            padding: 1rem;
+            overflow-x: auto;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.875rem;
+        }
+        
+        .status-200 { @apply bg-green-100 text-green-800; }
+        .status-300 { @apply bg-blue-100 text-blue-800; }
+        .status-400 { @apply bg-yellow-100 text-yellow-800; }
+        .status-500 { @apply bg-red-100 text-red-800; }
+        
+        .method-get { @apply bg-blue-100 text-blue-800; }
+        .method-post { @apply bg-green-100 text-green-800; }
+        .method-put { @apply bg-yellow-100 text-yellow-800; }
+        .method-delete { @apply bg-red-100 text-red-800; }
+        .method-patch { @apply bg-purple-100 text-purple-800; }
+        
+        .level-info { @apply bg-blue-100 text-blue-800; }
+        .level-warning { @apply bg-yellow-100 text-yellow-800; }
+        .level-error { @apply bg-red-100 text-red-800; }
+        .level-success { @apply bg-green-100 text-green-800; }
+        
+        .animate-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: .5;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 debug-dashboard">
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect, useCallback } = React;
+        
+        function DebugDashboard() {
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [stats, setStats] = useState(null);
+            const [requests, setRequests] = useState({ items: [], totalCount: 0 });
+            const [queries, setQueries] = useState({ items: [], totalCount: 0 });
+            const [logs, setLogs] = useState({ items: [], totalCount: 0 });
+            const [exceptions, setExceptions] = useState({ items: [], totalCount: 0 });
+            const [loading, setLoading] = useState(false);
+            const [filter, setFilter] = useState({
+                page: 1,
+                pageSize: 50,
+                sortBy: 'timestamp',
+                sortDescending: true
+            });
+            
+            const fetchStats = useCallback(async () => {
+                try {
+                    const response = await fetch('/_debug/api/stats');
+                    if (response.ok) {
+                        const data = await response.json();
+                        setStats(data);
+                    }
+                } catch (error) {
+                    console.error('Error fetching stats:', error);
+                }
+            }, []);
+            
+            const fetchRequests = useCallback(async () => {
+                try {
+                    setLoading(true);
+                    const params = new URLSearchParams(filter);
+                    const response = await fetch(`/_debug/api/requests?${params}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        setRequests(data);
+                    }
+                } catch (error) {
+                    console.error('Error fetching requests:', error);
+                } finally {
+                    setLoading(false);
+                }
+            }, [filter]);
+            
+            const fetchQueries = useCallback(async () => {
+                try {
+                    setLoading(true);
+                    const params = new URLSearchParams(filter);
+                    const response = await fetch(`/_debug/api/queries?${params}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        setQueries(data);
+                    }
+                } catch (error) {
+                    console.error('Error fetching queries:', error);
+                } finally {
+                    setLoading(false);
+                }
+            }, [filter]);
+            
+            const fetchLogs = useCallback(async () => {
+                try {
+                    setLoading(true);
+                    const params = new URLSearchParams(filter);
+                    const response = await fetch(`/_debug/api/logs?${params}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        setLogs(data);
+                    }
+                } catch (error) {
+                    console.error('Error fetching logs:', error);
+                } finally {
+                    setLoading(false);
+                }
+            }, [filter]);
+            
+            const fetchExceptions = useCallback(async () => {
+                try {
+                    setLoading(true);
+                    const params = new URLSearchParams(filter);
+                    const response = await fetch(`/_debug/api/exceptions?${params}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        setExceptions(data);
+                    }
+                } catch (error) {
+                    console.error('Error fetching exceptions:', error);
+                } finally {
+                    setLoading(false);
+                }
+            }, [filter]);
+            
+            const clearAll = async () => {
+                if (confirm('Are you sure you want to clear all debug data?')) {
+                    try {
+                        await fetch('/_debug/api/clear', { method: 'DELETE' });
+                        // Refresh current data
+                        fetchStats();
+                        if (activeTab === 'requests') fetchRequests();
+                        if (activeTab === 'queries') fetchQueries();
+                        if (activeTab === 'logs') fetchLogs();
+                        if (activeTab === 'exceptions') fetchExceptions();
+                    } catch (error) {
+                        console.error('Error clearing data:', error);
+                    }
+                }
+            };
+            
+            useEffect(() => {
+                fetchStats();
+                const interval = setInterval(fetchStats, 5000); // Refresh every 5 seconds
+                return () => clearInterval(interval);
+            }, [fetchStats]);
+            
+            useEffect(() => {
+                if (activeTab === 'requests') fetchRequests();
+                if (activeTab === 'queries') fetchQueries();
+                if (activeTab === 'logs') fetchLogs();
+                if (activeTab === 'exceptions') fetchExceptions();
+            }, [activeTab, fetchRequests, fetchQueries, fetchLogs, fetchExceptions]);
+            
+            const formatDate = (dateString) => {
+                return new Date(dateString).toLocaleString();
+            };
+            
+            const getStatusClass = (statusCode) => {
+                if (statusCode >= 200 && statusCode < 300) return 'status-200';
+                if (statusCode >= 300 && statusCode < 400) return 'status-300';
+                if (statusCode >= 400 && statusCode < 500) return 'status-400';
+                if (statusCode >= 500) return 'status-500';
+                return 'bg-gray-100 text-gray-800';
+            };
+            
+            const getMethodClass = (method) => {
+                return `method-${method.toLowerCase()}`;
+            };
+            
+            const getLevelClass = (level) => {
+                return `level-${level.toLowerCase()}`;
+            };
+            
+            return (
+                <div className="min-h-screen bg-gray-50">
+                    <div className="bg-white shadow-sm border-b">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                            <div className="flex justify-between items-center py-6">
+                                <div>
+                                    <h1 className="text-3xl font-bold text-gray-900">Debug Dashboard</h1>
+                                    <p className="text-gray-600">ASP.NET Core debugging and monitoring</p>
+                                </div>
+                                <div className="flex space-x-2">
+                                    <button
+                                        onClick={() => window.location.reload()}
+                                        className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium"
+                                    >
+                                        Refresh
+                                    </button>
+                                    <button
+                                        onClick={clearAll}
+                                        className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium"
+                                    >
+                                        Clear All
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                        <div className="flex space-x-1 mb-8">
+                            {[
+                                { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+                                { id: 'requests', label: 'Requests', icon: '🌐' },
+                                { id: 'queries', label: 'SQL Queries', icon: '🗃️' },
+                                { id: 'logs', label: 'Logs', icon: '📝' },
+                                { id: 'exceptions', label: 'Exceptions', icon: '❌' }
+                            ].map(tab => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={`px-4 py-2 rounded-md text-sm font-medium ${
+                                        activeTab === tab.id
+                                            ? 'bg-blue-500 text-white'
+                                            : 'bg-white text-gray-700 hover:bg-gray-50'
+                                    }`}
+                                >
+                                    {tab.icon} {tab.label}
+                                </button>
+                            ))}
+                        </div>
+                        
+                        {activeTab === 'dashboard' && (
+                            <div>
+                                {stats && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                                        <div className="bg-white p-6 rounded-lg shadow">
+                                            <div className="flex items-center">
+                                                <div className="p-2 bg-blue-100 rounded-lg">
+                                                    <span className="text-2xl">🌐</span>
+                                                </div>
+                                                <div className="ml-4">
+                                                    <p className="text-sm text-gray-600">Total Requests</p>
+                                                    <p className="text-2xl font-bold text-gray-900">{stats.totalRequests}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="bg-white p-6 rounded-lg shadow">
+                                            <div className="flex items-center">
+                                                <div className="p-2 bg-green-100 rounded-lg">
+                                                    <span className="text-2xl">🗃️</span>
+                                                </div>
+                                                <div className="ml-4">
+                                                    <p className="text-sm text-gray-600">SQL Queries</p>
+                                                    <p className="text-2xl font-bold text-gray-900">{stats.totalSqlQueries}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="bg-white p-6 rounded-lg shadow">
+                                            <div className="flex items-center">
+                                                <div className="p-2 bg-yellow-100 rounded-lg">
+                                                    <span className="text-2xl">📝</span>
+                                                </div>
+                                                <div className="ml-4">
+                                                    <p className="text-sm text-gray-600">Log Entries</p>
+                                                    <p className="text-2xl font-bold text-gray-900">{stats.totalLogs}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="bg-white p-6 rounded-lg shadow">
+                                            <div className="flex items-center">
+                                                <div className="p-2 bg-red-100 rounded-lg">
+                                                    <span className="text-2xl">❌</span>
+                                                </div>
+                                                <div className="ml-4">
+                                                    <p className="text-sm text-gray-600">Exceptions</p>
+                                                    <p className="text-2xl font-bold text-gray-900">{stats.totalExceptions}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {stats?.slowestRequests?.length > 0 && (
+                                    <div className="bg-white rounded-lg shadow mb-6">
+                                        <div className="px-6 py-4 border-b">
+                                            <h3 className="text-lg font-medium text-gray-900">Slowest Requests</h3>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="min-w-full divide-y divide-gray-200">
+                                                <thead className="bg-gray-50">
+                                                    <tr>
+                                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Method</th>
+                                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Path</th>
+                                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
+                                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Timestamp</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="bg-white divide-y divide-gray-200">
+                                                    {stats.slowestRequests.map(request => (
+                                                        <tr key={request.id}>
+                                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                                <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getMethodClass(request.method)}`}>
+                                                                    {request.method}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-6 py-4 text-sm text-gray-900">{request.path}</td>
+                                                            <td className="px-6 py-4 text-sm text-gray-900">{request.executionTimeMs}ms</td>
+                                                            <td className="px-6 py-4 text-sm text-gray-500">{formatDate(request.timestamp)}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        
+                        {activeTab === 'requests' && (
+                            <div className="bg-white rounded-lg shadow">
+                                <div className="px-6 py-4 border-b">
+                                    <h3 className="text-lg font-medium text-gray-900">HTTP Requests</h3>
+                                </div>
+                                {loading ? (
+                                    <div className="p-8 text-center">
+                                        <div className="animate-pulse text-gray-500">Loading...</div>
+                                    </div>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-full divide-y divide-gray-200">
+                                            <thead className="bg-gray-50">
+                                                <tr>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Method</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Path</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Timestamp</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="bg-white divide-y divide-gray-200">
+                                                {requests.items.map(request => (
+                                                    <tr key={request.id}>
+                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getMethodClass(request.method)}`}>
+                                                                {request.method}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-sm text-gray-900">{request.path}</td>
+                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusClass(request.statusCode)}`}>
+                                                                {request.statusCode}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-sm text-gray-900">{request.executionTimeMs}ms</td>
+                                                        <td className="px-6 py-4 text-sm text-gray-500">{formatDate(request.timestamp)}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        
+                        {activeTab === 'queries' && (
+                            <div className="bg-white rounded-lg shadow">
+                                <div className="px-6 py-4 border-b">
+                                    <h3 className="text-lg font-medium text-gray-900">SQL Queries</h3>
+                                </div>
+                                {loading ? (
+                                    <div className="p-8 text-center">
+                                        <div className="animate-pulse text-gray-500">Loading...</div>
+                                    </div>
+                                ) : (
+                                    <div className="divide-y divide-gray-200">
+                                        {queries.items.map(query => (
+                                            <div key={query.id} className="p-6">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div className="flex items-center space-x-2">
+                                                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                                                            query.isSuccessful ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                                        }`}>
+                                                            {query.isSuccessful ? 'Success' : 'Error'}
+                                                        </span>
+                                                        <span className="text-sm text-gray-500">{query.executionTimeMs}ms</span>
+                                                    </div>
+                                                    <span className="text-sm text-gray-500">{formatDate(query.timestamp)}</span>
+                                                </div>
+                                                <div className="code-block">
+                                                    <pre className="text-sm">{query.query}</pre>
+                                                </div>
+                                                {Object.keys(query.parameters).length > 0 && (
+                                                    <div className="mt-2">
+                                                        <strong className="text-sm text-gray-700">Parameters:</strong>
+                                                        <div className="mt-1 text-sm text-gray-600">
+                                                            {Object.entries(query.parameters).map(([key, value]) => (
+                                                                <div key={key} className="ml-2">
+                                                                    <span className="font-medium">{key}:</span> {JSON.stringify(value)}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        
+                        {activeTab === 'logs' && (
+                            <div className="bg-white rounded-lg shadow">
+                                <div className="px-6 py-4 border-b">
+                                    <h3 className="text-lg font-medium text-gray-900">Log Entries</h3>
+                                </div>
+                                {loading ? (
+                                    <div className="p-8 text-center">
+                                        <div className="animate-pulse text-gray-500">Loading...</div>
+                                    </div>
+                                ) : (
+                                    <div className="divide-y divide-gray-200">
+                                        {logs.items.map(log => (
+                                            <div key={log.id} className="p-6">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div className="flex items-center space-x-2">
+                                                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getLevelClass(log.level)}`}>
+                                                            {log.level}
+                                                        </span>
+                                                        {log.tag && (
+                                                            <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+                                                                {log.tag}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <span className="text-sm text-gray-500">{formatDate(log.timestamp)}</span>
+                                                </div>
+                                                <div className="text-sm text-gray-900">{log.message}</div>
+                                                {Object.keys(log.properties).length > 0 && (
+                                                    <div className="mt-2">
+                                                        <strong className="text-sm text-gray-700">Properties:</strong>
+                                                        <div className="mt-1 text-sm text-gray-600">
+                                                            {Object.entries(log.properties).map(([key, value]) => (
+                                                                <div key={key} className="ml-2">
+                                                                    <span className="font-medium">{key}:</span> {JSON.stringify(value)}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        
+                        {activeTab === 'exceptions' && (
+                            <div className="bg-white rounded-lg shadow">
+                                <div className="px-6 py-4 border-b">
+                                    <h3 className="text-lg font-medium text-gray-900">Exceptions</h3>
+                                </div>
+                                {loading ? (
+                                    <div className="p-8 text-center">
+                                        <div className="animate-pulse text-gray-500">Loading...</div>
+                                    </div>
+                                ) : (
+                                    <div className="divide-y divide-gray-200">
+                                        {exceptions.items.map(exception => (
+                                            <div key={exception.id} className="p-6">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div className="flex items-center space-x-2">
+                                                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
+                                                            {exception.exceptionType}
+                                                        </span>
+                                                        <span className="text-sm text-gray-500">{exception.method} {exception.path}</span>
+                                                    </div>
+                                                    <span className="text-sm text-gray-500">{formatDate(exception.timestamp)}</span>
+                                                </div>
+                                                <div className="text-sm text-gray-900 mb-2">{exception.message}</div>
+                                                {exception.stackTrace && (
+                                                    <div className="code-block">
+                                                        <pre className="text-xs">{exception.stackTrace}</pre>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+        
+        ReactDOM.render(<DebugDashboard />, document.getElementById('root'));
+    </script>
+</body>
+</html>
