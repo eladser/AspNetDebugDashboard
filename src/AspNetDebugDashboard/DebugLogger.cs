@@ -22,7 +22,6 @@ public static class DebugLogger
     /// </summary>
     public static async Task LogAsync(string message, string level, string? tag = null, Dictionary<string, object>? properties = null)
     {
-        var httpContextAccessor = GetService<IHttpContextAccessor>();
         var debugLogger = GetService<IDebugLogger>();
         
         if (debugLogger != null)
@@ -63,7 +62,7 @@ public static class DebugLogger
         await LogAsync(message, "Success", tag, properties);
     }
     
-    private static T? GetService<T>()
+    private static T? GetService<T>() where T : class
     {
         var httpContextAccessor = ServiceProvider?.GetService<IHttpContextAccessor>();
         var httpContext = httpContextAccessor?.HttpContext;
