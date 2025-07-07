@@ -18,24 +18,44 @@
     <PackageProjectUrl>https://github.com/eladser/AspNetDebugDashboard</PackageProjectUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>aspnetcore;debugging;dashboard;development;telescope;logging;monitoring;efcore;sql;exceptions;requests;performance;developer-tools</PackageTags>
+    <PackageTags>aspnetcore;debugging;dashboard;development;telescope;logging;monitoring;efcore;sql;exceptions;requests;performance;developer-tools;signalr;realtime</PackageTags>
     <RepositoryUrl>https://github.com/eladser/AspNetDebugDashboard</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <RepositoryBranch>main</RepositoryBranch>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>
-      Initial release of ASP.NET Debug Dashboard.
+      Version 1.0.0 - Production-ready release with comprehensive features:
       
-      Features:
+      ✨ Features:
       - HTTP request monitoring with real-time tracking
       - SQL query analysis with Entity Framework Core integration
       - Exception tracking with full stack traces
       - Custom logging with structured data
       - Beautiful modern dashboard with dark/light themes
+      - Real-time updates with SignalR integration
       - Export/import capabilities
       - Performance metrics and insights
       - Advanced search and filtering
-      - Zero-configuration setup
+      - Background cleanup services
+      - Health monitoring and checks
+      - Comprehensive security controls
+      - Zero-configuration setup with extensive customization
+      
+      🔧 Technical:
+      - Multi-framework support (.NET 7.0 and 8.0)
+      - LiteDB storage for lightweight operation
+      - Comprehensive test coverage
+      - Production-ready with minimal performance impact
+      - SignalR for real-time dashboard updates
+      - Background services for data cleanup
+      - Health checks for monitoring
+      
+      📚 Documentation:
+      - Complete setup and configuration guide
+      - API documentation
+      - Docker deployment examples
+      - Security best practices
+      - Performance optimization tips
     </PackageReleaseNotes>
     <IsPackable>true</IsPackable>
     <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
@@ -54,23 +74,41 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- ASP.NET Core packages -->
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="7.0.0" Condition="'$(TargetFramework)' == 'net7.0'" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.0" Condition="'$(TargetFramework)' == 'net8.0'" />
     
+    <!-- Entity Framework packages -->
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="7.0.0" Condition="'$(TargetFramework)' == 'net7.0'" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" Condition="'$(TargetFramework)' == 'net8.0'" />
     
     <PackageReference Include="Microsoft.EntityFrameworkCore.Diagnostics" Version="7.0.0" Condition="'$(TargetFramework)' == 'net7.0'" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Diagnostics" Version="8.0.0" Condition="'$(TargetFramework)' == 'net8.0'" />
     
+    <!-- Storage -->
     <PackageReference Include="LiteDB" Version="5.0.17" />
     
+    <!-- File providers -->
     <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="7.0.0" Condition="'$(TargetFramework)' == 'net7.0'" />
     <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="8.0.0" Condition="'$(TargetFramework)' == 'net8.0'" />
     
+    <!-- SPA services -->
     <PackageReference Include="Microsoft.AspNetCore.SpaServices.Extensions" Version="7.0.0" Condition="'$(TargetFramework)' == 'net7.0'" />
     <PackageReference Include="Microsoft.AspNetCore.SpaServices.Extensions" Version="8.0.0" Condition="'$(TargetFramework)' == 'net8.0'" />
     
+    <!-- SignalR for real-time updates -->
+    <PackageReference Include="Microsoft.AspNetCore.SignalR" Version="7.0.0" Condition="'$(TargetFramework)' == 'net7.0'" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR" Version="8.0.0" Condition="'$(TargetFramework)' == 'net8.0'" />
+    
+    <!-- Health checks -->
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="7.0.0" Condition="'$(TargetFramework)' == 'net7.0'" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="8.0.0" Condition="'$(TargetFramework)' == 'net8.0'" />
+    
+    <!-- Background services -->
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="7.0.0" Condition="'$(TargetFramework)' == 'net7.0'" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" Condition="'$(TargetFramework)' == 'net8.0'" />
+    
+    <!-- JSON serialization -->
     <PackageReference Include="System.Text.Json" Version="7.0.0" Condition="'$(TargetFramework)' == 'net7.0'" />
     <PackageReference Include="System.Text.Json" Version="8.0.0" Condition="'$(TargetFramework)' == 'net8.0'" />
   </ItemGroup>
@@ -87,5 +125,14 @@
   <ItemGroup>
     <InternalsVisibleTo Include="AspNetDebugDashboard.Tests" />
   </ItemGroup>
+
+  <!-- Define framework-specific constants -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net7.0'">
+    <DefineConstants>$(DefineConstants);NET7_0</DefineConstants>
+  </PropertyGroup>
+  
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <DefineConstants>$(DefineConstants);NET8_0</DefineConstants>
+  </PropertyGroup>
 
 </Project>
