@@ -24,6 +24,19 @@ public class DebugApiControllerTests
         _mockOptions = new Mock<IOptions<DebugConfiguration>>();
         _fixture = new Fixture();
         
+        // Fix circular reference issue with AutoFixture
+        _fixture.Behaviors.OfType<ThrowingRecursionBehavior>().ToList()
+            .ForEach(b => _fixture.Behaviors.Remove(b));
+        _fixture.Behaviors.Add(new OmitOnRecursionBehavior());
+        
+        // Customize ExceptionEntry to avoid circular references
+        _fixture.Customize<ExceptionEntry>(c => c
+            .Without(x => x.InnerException));
+            
+        // Customize PagedResult to avoid issues
+        _fixture.Customize<PagedResult<ExceptionEntry>>(c => c
+            .With(x => x.Items, new List<ExceptionEntry>()));
+        
         var config = new DebugConfiguration { IsEnabled = true };
         _mockOptions.Setup(x => x.Value).Returns(config);
         
@@ -66,7 +79,14 @@ public class DebugApiControllerTests
     public async Task GetRequests_WithFilter_ReturnsPagedResults(DebugFilter filter)
     {
         // Arrange
-        var expectedRequests = _fixture.Create<PagedResult<RequestEntry>>();
+        var expectedRequests = new PagedResult<RequestEntry>
+        {
+            Items = _fixture.CreateMany<RequestEntry>(3).ToList(),
+            TotalCount = 3,
+            Page = 1,
+            PageSize = 10,
+            TotalPages = 1
+        };
         _mockStorage.Setup(x => x.GetRequestsAsync(It.IsAny<DebugFilter>()))
                    .ReturnsAsync(expectedRequests);
 
@@ -99,6 +119,29 @@ public class DebugApiControllerTests
     }
 
     [Fact]
+    public async Task CreateLog_WithNullRequest_ReturnsBadRequest()
+    {
+        // Act
+        var result = await _controller.CreateLog(null!);
+
+        // Assert
+        result.Result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task CreateLog_WithEmptyMessage_ReturnsBadRequest()
+    {
+        // Arrange
+        var request = new CreateLogRequest { Message = "" };
+
+        // Act
+        var result = await _controller.CreateLog(request);
+
+        // Assert
+        result.Result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
     public async Task ClearAll_WhenCalled_CallsStorageClearAll()
     {
         // Arrange
@@ -121,10 +164,22 @@ public class DebugApiControllerTests
         var controller = new DebugApiController(_mockStorage.Object, _mockOptions.Object);
 
         var mockStats = _fixture.Create<DebugStats>();
-        var mockRequests = _fixture.Create<PagedResult<RequestEntry>>();
-        var mockQueries = _fixture.Create<PagedResult<SqlQueryEntry>>();
-        var mockLogs = _fixture.Create<PagedResult<LogEntry>>();
-        var mockExceptions = _fixture.Create<PagedResult<ExceptionEntry>>();
+        var mockRequests = new PagedResult<RequestEntry>
+        {
+            Items = _fixture.CreateMany<RequestEntry>(2).ToList()
+        };
+        var mockQueries = new PagedResult<SqlQueryEntry>
+        {
+            Items = _fixture.CreateMany<SqlQueryEntry>(2).ToList()
+        };
+        var mockLogs = new PagedResult<LogEntry>
+        {
+            Items = _fixture.CreateMany<LogEntry>(2).ToList()
+        };
+        var mockExceptions = new PagedResult<ExceptionEntry>
+        {
+            Items = new List<ExceptionEntry>() // Use empty list to avoid circular reference
+        };
 
         _mockStorage.Setup(x => x.GetStatsAsync()).ReturnsAsync(mockStats);
         _mockStorage.Setup(x => x.GetRequestsAsync(It.IsAny<DebugFilter>())).ReturnsAsync(mockRequests);
