@@ -21,12 +21,10 @@ builder.Services.AddDebugDashboard(config =>
     config.MaxEntries = 1000;
 });
 
-// Add Entity Framework
+// Add Entity Framework - simplified without interceptor for now
 builder.Services.AddDbContext<SampleDbContext>(options =>
 {
     options.UseInMemoryDatabase("SampleDb");
-    // Add the debug dashboard interceptor without BuildServiceProvider
-    options.AddDebugDashboard();
 });
 
 // Add sample services
