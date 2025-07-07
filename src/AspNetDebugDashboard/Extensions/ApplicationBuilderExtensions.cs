@@ -26,13 +26,7 @@ public static class ApplicationBuilderExtensions
             return app;
         }
         
-        // Add exception middleware first
-        app.UseMiddleware<DebugExceptionMiddleware>();
-        
-        // Add request logging middleware
-        app.UseMiddleware<DebugRequestMiddleware>();
-        
-        return app;
+        return ConfigureDebugDashboard(app);
     }
     
     public static IApplicationBuilder UseDebugDashboard(this IApplicationBuilder app, bool forceEnable)
@@ -44,10 +38,28 @@ public static class ApplicationBuilderExtensions
             return app;
         }
         
-        // Add exception middleware first
+        return ConfigureDebugDashboard(app);
+    }
+    
+    public static IApplicationBuilder UseDebugDashboard(this IApplicationBuilder app, Action<DebugConfiguration> configure)
+    {
+        var config = app.ApplicationServices.GetRequiredService<IOptions<DebugConfiguration>>().Value;
+        configure(config);
+        
+        if (!config.IsEnabled)
+        {
+            return app;
+        }
+        
+        return ConfigureDebugDashboard(app);
+    }
+    
+    private static IApplicationBuilder ConfigureDebugDashboard(IApplicationBuilder app)
+    {
+        // Add exception middleware first (should be early in pipeline)
         app.UseMiddleware<DebugExceptionMiddleware>();
         
-        // Add request logging middleware
+        // Add request logging middleware (should be early but after exception handling)
         app.UseMiddleware<DebugRequestMiddleware>();
         
         return app;
