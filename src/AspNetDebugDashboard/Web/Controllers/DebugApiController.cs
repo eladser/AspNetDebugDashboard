@@ -15,8 +15,8 @@ public class DebugApiController : ControllerBase
 
     public DebugApiController(IDebugStorage storage, IOptions<DebugConfiguration> config)
     {
-        _storage = storage;
-        _config = config.Value;
+        _storage = storage ?? throw new ArgumentNullException(nameof(storage));
+        _config = config?.Value ?? throw new ArgumentNullException(nameof(config));
     }
 
     [HttpGet("stats")]
@@ -113,6 +113,13 @@ public class DebugApiController : ControllerBase
     {
         if (!_config.IsEnabled) return NotFound();
         
+        // Add null checks and validation
+        if (request == null)
+            return BadRequest("Request cannot be null");
+            
+        if (string.IsNullOrEmpty(request.Message))
+            return BadRequest("Message is required");
+        
         var logEntry = new LogEntry
         {
             Message = request.Message,
@@ -120,7 +127,7 @@ public class DebugApiController : ControllerBase
             Tag = request.Tag,
             Category = request.Category,
             Properties = request.Properties ?? new Dictionary<string, object>(),
-            RequestId = HttpContext.TraceIdentifier
+            RequestId = HttpContext?.TraceIdentifier ?? Guid.NewGuid().ToString()
         };
         
         var id = await _storage.StoreLogAsync(logEntry);
