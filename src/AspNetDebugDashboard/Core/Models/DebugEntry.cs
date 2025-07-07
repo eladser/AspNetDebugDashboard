@@ -7,6 +7,7 @@ public abstract class DebugEntry
     public string Id { get; set; } = Guid.NewGuid().ToString();
     public string RequestId { get; set; } = string.Empty;
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+    public string Type { get; set; } = string.Empty;
     public string? CorrelationId { get; set; }
     public string? UserId { get; set; }
     public string? SessionId { get; set; }
@@ -25,11 +26,12 @@ public class RequestEntry : DebugEntry
     public string? RequestBody { get; set; }
     public string? ResponseBody { get; set; }
     public string? ContentType { get; set; }
+    public string? ResponseContentType { get; set; }
     public string? UserAgent { get; set; }
-    public string? IpAddress { get; set; }
+    public string? IPAddress { get; set; }
     public List<SqlQueryEntry> SqlQueries { get; set; } = new();
     public List<LogEntry> Logs { get; set; } = new();
-    public ExceptionEntry? Exception { get; set; }
+    public string? Exception { get; set; }
     public long RequestSize { get; set; }
     public long ResponseSize { get; set; }
     public string? Protocol { get; set; }
@@ -78,7 +80,7 @@ public class ExceptionEntry : DebugEntry
     public ExceptionEntry? InnerException { get; set; }
     public Dictionary<string, object> Data { get; set; } = new();
     public string? UserAgent { get; set; }
-    public string? IpAddress { get; set; }
+    public string? IPAddress { get; set; }
     public string? RequestBody { get; set; }
     public Dictionary<string, string> Headers { get; set; } = new();
     public string? TargetSite { get; set; }
