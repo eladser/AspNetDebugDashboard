@@ -26,4 +26,8 @@ public class DebugConfiguration
     public int MaxStackTraceDepth { get; set; } = 50;
     public bool EnableMemoryProfiling { get; set; } = false;
     public bool EnableCpuProfiling { get; set; } = false;
+    
+    // Missing properties referenced in the code
+    public TimeSpan? CleanupInterval { get; set; } = TimeSpan.FromHours(1);
+    public long MaxDatabaseSize { get; set; } = 100 * 1024 * 1024; // 100MB
 }
