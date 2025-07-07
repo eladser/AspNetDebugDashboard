@@ -294,7 +294,7 @@ public class LoadTests
         stopwatch.Stop();
 
         // All sessions should complete within reasonable time
-        stopwatch.ElapsedSeconds.Should().BeLessThan(30);
+        stopwatch.Elapsed.TotalSeconds.Should().BeLessThan(30);
     }
 
     private async Task SimulateUserSession()
