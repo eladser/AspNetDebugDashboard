@@ -85,19 +85,3 @@ public class ExceptionEntry : DebugEntry
     public int? HResult { get; set; }
     public string? HelpLink { get; set; }
 }
-
-public class DebugConfiguration
-{
-    public bool IsEnabled { get; set; } = true;
-    public string DatabasePath { get; set; } = "debug-dashboard.db";
-    public string BasePath { get; set; } = "/_debug";
-    public int MaxEntries { get; set; } = 1000;
-    public bool LogRequestBodies { get; set; } = true;
-    public bool LogResponseBodies { get; set; } = false;
-    public bool LogSqlQueries { get; set; } = true;
-    public bool LogExceptions { get; set; } = true;
-    public bool EnableRealTimeUpdates { get; set; } = true;
-    public List<string> ExcludedPaths { get; set; } = new() { "/_debug", "/favicon.ico", "/robots.txt" };
-    public List<string> ExcludedHeaders { get; set; } = new() { "Authorization", "Cookie" };
-    public int MaxBodySize { get; set; } = 1024 * 1024; // 1MB
-}
