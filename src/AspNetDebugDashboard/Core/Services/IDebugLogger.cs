@@ -1,4 +1,5 @@
 using AspNetDebugDashboard.Core.Models;
+using Microsoft.AspNetCore.Http;
 
 namespace AspNetDebugDashboard.Core.Services;
 
@@ -32,7 +33,7 @@ public class DebugLogger : IDebugLogger
             Message = message,
             Level = level,
             Tag = tag,
-            RequestId = requestId,
+            RequestId = requestId ?? string.Empty,
             Properties = properties ?? new Dictionary<string, object>()
         };
 
