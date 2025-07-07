@@ -143,7 +143,7 @@ public class DebugDashboardHealthCheck : IHealthCheck
         _logger = logger;
     }
 
-    public async Task<HealthCheckResult> CheckHealthAsync(
+    public async Task<Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
@@ -151,7 +151,7 @@ public class DebugDashboardHealthCheck : IHealthCheck
         {
             if (!_config.IsEnabled)
             {
-                return HealthCheckResult.Healthy("Debug Dashboard is disabled");
+                return Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy("Debug Dashboard is disabled");
             }
 
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
@@ -192,16 +192,16 @@ public class DebugDashboardHealthCheck : IHealthCheck
             if (warnings.Any())
             {
                 data["warnings"] = warnings;
-                return HealthCheckResult.Degraded("Debug Dashboard has warnings", null, data);
+                return Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Degraded("Debug Dashboard has warnings", null, data);
             }
 
-            return HealthCheckResult.Healthy("Debug Dashboard is healthy", data);
+            return Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy("Debug Dashboard is healthy", data);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Health check failed");
             
-            return HealthCheckResult.Unhealthy(
+            return Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Unhealthy(
                 "Debug Dashboard health check failed", 
                 ex, 
                 new Dictionary<string, object>
