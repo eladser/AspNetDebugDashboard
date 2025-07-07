@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 using AutoFixture;
 using AutoFixture.Xunit2;
+using Xunit;
 
 namespace AspNetDebugDashboard.Tests;
 
