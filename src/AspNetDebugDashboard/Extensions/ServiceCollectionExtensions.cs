@@ -53,7 +53,7 @@ public static class ServiceCollectionExtensions
         // Register core services
         services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
         services.AddSingleton<DebugContext>();
-        services.AddScoped<IDebugLogger, DebugLogger>();
+        services.AddScoped<IDebugLogger, Core.Services.DebugLogger>();
         services.AddScoped<IDebugDashboardService, DebugDashboardService>();
         
         // Register storage
