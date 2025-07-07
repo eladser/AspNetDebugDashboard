@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 using System.Diagnostics;
 using System.Text;
+using Xunit;
 
 namespace AspNetDebugDashboard.Tests;
 
