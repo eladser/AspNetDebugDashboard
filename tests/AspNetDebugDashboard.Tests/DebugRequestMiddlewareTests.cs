@@ -32,8 +32,8 @@ public class DebugRequestMiddlewareTests
             LogRequestBodies = true,
             LogResponseBodies = true,
             MaxBodySize = 1024 * 1024,
-            ExcludedPaths = new[] { "/health" },
-            ExcludedHeaders = new[] { "Authorization" }
+            ExcludedPaths = new List<string> { "/health" },
+            ExcludedHeaders = new List<string> { "Authorization" }
         };
         
         _mockOptions.Setup(x => x.Value).Returns(_config);
@@ -217,9 +217,9 @@ public class DebugRequestMiddlewareTests
         var middleware = new DebugRequestMiddleware(_mockNext.Object, _mockOptions.Object, _mockStorage.Object);
         var context = CreateHttpContext();
         
-        context.Request.Headers.Add("Authorization", "Bearer token");
-        context.Request.Headers.Add("Content-Type", "application/json");
-        context.Request.Headers.Add("User-Agent", "Test Agent");
+        context.Request.Headers["Authorization"] = "Bearer token";
+        context.Request.Headers["Content-Type"] = "application/json";
+        context.Request.Headers["User-Agent"] = "Test Agent";
 
         _mockNext.Setup(x => x(context)).Returns(Task.CompletedTask);
         _mockStorage.Setup(x => x.StoreRequestAsync(It.IsAny<RequestEntry>()))
