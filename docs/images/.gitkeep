@@ -1,0 +1,18 @@
+# Images Directory
+
+This directory contains images and screenshots for the documentation.
+
+## Adding Screenshots
+
+To add the dashboard preview screenshot:
+
+1. Save your screenshot as `dashboard-preview.png`
+2. Upload it to this directory
+3. The README.md will automatically reference it
+
+The screenshot should show:
+- The main dashboard interface
+- Live statistics (requests, queries, logs, exceptions)
+- The modern purple gradient design
+- Recent HTTP requests list
+- Navigation tabs (Dashboard, Requests, SQL Queries, Logs, Exceptions)
