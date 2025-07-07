@@ -57,8 +57,8 @@ public class DebugCommandInterceptor : DbCommandInterceptor
         return await base.ScalarExecutingAsync(command, eventData, result, cancellationToken);
     }
 
-    public override async ValueTask<object> ScalarExecutedAsync(
-        DbCommand command, CommandExecutedEventData eventData, object result,
+    public override async ValueTask<object?> ScalarExecutedAsync(
+        DbCommand command, CommandExecutedEventData eventData, object? result,
         CancellationToken cancellationToken = default)
     {
         await LogCommandExecutedAsync(command, eventData, "ExecuteScalar");
@@ -85,10 +85,9 @@ public class DebugCommandInterceptor : DbCommandInterceptor
         
         var queryEntry = new SqlQueryEntry
         {
-            Type = "SqlQuery",
             Query = command.CommandText,
             Parameters = GetParameters(command),
-            RequestId = requestId,
+            RequestId = requestId ?? string.Empty,
             Database = GetDatabaseName(command),
             ConnectionString = GetSafeConnectionString(command.Connection?.ConnectionString)
         };
@@ -123,7 +122,6 @@ public class DebugCommandInterceptor : DbCommandInterceptor
         var queryEntry = new SqlQueryEntry
         {
             Id = queryId,
-            Type = "SqlQuery",
             Query = command.CommandText,
             Parameters = GetParameters(command),
             ExecutionTimeMs = executionTimeMs,
@@ -155,7 +153,6 @@ public class DebugCommandInterceptor : DbCommandInterceptor
         var queryEntry = new SqlQueryEntry
         {
             Id = queryId,
-            Type = "SqlQuery",
             Query = command.CommandText,
             Parameters = GetParameters(command),
             ExecutionTimeMs = executionTimeMs,
