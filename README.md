@@ -8,7 +8,7 @@
 
 Transform your debugging experience with real-time insights into HTTP requests, database queries, logs, and exceptions - all in a modern, responsive interface inspired by Laravel Telescope.
 
-![ASP.NET Debug Dashboard](https://raw.githubusercontent.com/eladser/AspNetDebugDashboard/main/docs/images/dashboard-preview.png)
+<!-- ![ASP.NET Debug Dashboard](https://raw.githubusercontent.com/eladser/AspNetDebugDashboard/main/docs/images/dashboard-preview.png) -->
 
 ## ✨ Features
 
