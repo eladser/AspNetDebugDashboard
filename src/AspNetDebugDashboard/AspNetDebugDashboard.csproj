@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFrameworks>net8.0;net9.0</TargetFrameworks>
@@ -74,6 +74,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- ASP.NET Core Framework Reference -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    
     <!-- Entity Framework packages -->
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.11" Condition="'$(TargetFramework)' == 'net8.0'" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" Condition="'$(TargetFramework)' == 'net9.0'" />
@@ -83,22 +86,6 @@
     
     <!-- Storage -->
     <PackageReference Include="LiteDB" Version="5.0.21" />
-    
-    <!-- File providers -->
-    <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="8.0.11" Condition="'$(TargetFramework)' == 'net8.0'" />
-    <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="9.0.0" Condition="'$(TargetFramework)' == 'net9.0'" />
-    
-    <!-- SPA services -->
-    <PackageReference Include="Microsoft.AspNetCore.SpaServices.Extensions" Version="8.0.11" Condition="'$(TargetFramework)' == 'net8.0'" />
-    <PackageReference Include="Microsoft.AspNetCore.SpaServices.Extensions" Version="9.0.0" Condition="'$(TargetFramework)' == 'net9.0'" />
-    
-    <!-- Health checks -->
-    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="8.0.11" Condition="'$(TargetFramework)' == 'net8.0'" />
-    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="9.0.0" Condition="'$(TargetFramework)' == 'net9.0'" />
-    
-    <!-- Background services -->
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" Condition="'$(TargetFramework)' == 'net8.0'" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" Condition="'$(TargetFramework)' == 'net9.0'" />
     
     <!-- JSON serialization (updated to secure versions) -->
     <PackageReference Include="System.Text.Json" Version="8.0.5" Condition="'$(TargetFramework)' == 'net8.0'" />
