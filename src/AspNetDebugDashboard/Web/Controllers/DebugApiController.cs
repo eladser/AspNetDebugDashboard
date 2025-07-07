@@ -165,7 +165,7 @@ public class DebugApiController : ControllerBase
     [HttpGet("export")]
     public async Task<ActionResult> ExportData([FromQuery] string format = "json")
     {
-        if (!_config.IsEnabled || !_config.AllowDataExport) return NotFound();
+        if (!_config.IsEnabled) return NotFound();
 
         var stats = await _storage.GetStatsAsync();
         var requests = await _storage.GetRequestsAsync(new DebugFilter { PageSize = int.MaxValue });
@@ -194,7 +194,7 @@ public class DebugApiController : ControllerBase
     }
 
     [HttpGet("search")]
-    public async Task<ActionResult> Search([FromQuery] string term, [FromQuery] string[] types = null)
+    public async Task<ActionResult> Search([FromQuery] string term, [FromQuery] string[] types = null!)
     {
         if (!_config.IsEnabled) return NotFound();
         if (string.IsNullOrWhiteSpace(term)) return BadRequest("Search term is required");
@@ -247,7 +247,7 @@ public class DebugApiController : ControllerBase
     [HttpGet("performance")]
     public async Task<ActionResult> GetPerformanceMetrics()
     {
-        if (!_config.IsEnabled || !_config.EnablePerformanceCounters) return NotFound();
+        if (!_config.IsEnabled) return NotFound();
 
         var stats = await _storage.GetStatsAsync();
         
