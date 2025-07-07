@@ -12,11 +12,11 @@ using Microsoft.AspNetCore.Builder;
 
 namespace AspNetDebugDashboard.Tests;
 
-public class DebugDashboardIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
+public class DebugDashboardIntegrationTests : IClassFixture<WebApplicationFactory<TestStartup>>
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly WebApplicationFactory<TestStartup> _factory;
 
-    public DebugDashboardIntegrationTests(WebApplicationFactory<Program> factory)
+    public DebugDashboardIntegrationTests(WebApplicationFactory<TestStartup> factory)
     {
         _factory = factory.WithWebHostBuilder(builder =>
         {
