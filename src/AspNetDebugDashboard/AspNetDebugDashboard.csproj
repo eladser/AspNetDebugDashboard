@@ -1,33 +1,78 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-    <TargetFramework>net7.0</TargetFramework>
+    <TargetFrameworks>net7.0;net8.0</TargetFrameworks>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>AspNetDebugDashboard</PackageId>
     <Title>ASP.NET Debug Dashboard</Title>
-    <Version>1.0.0-preview1</Version>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0</AssemblyVersion>
+    <FileVersion>1.0.0</FileVersion>
     <Authors>AspNetDebugDashboard Contributors</Authors>
-    <Description>A lightweight, developer-friendly debugging dashboard for ASP.NET Core apps inspired by Laravel Telescope</Description>
+    <Company>AspNetDebugDashboard</Company>
+    <Product>ASP.NET Debug Dashboard</Product>
+    <Description>A lightweight, developer-friendly debugging dashboard for ASP.NET Core apps inspired by Laravel Telescope. Monitor HTTP requests, SQL queries, exceptions, and logs in real-time with a beautiful modern interface.</Description>
+    <Summary>Real-time debugging dashboard for ASP.NET Core applications with HTTP request monitoring, SQL query analysis, exception tracking, and custom logging capabilities.</Summary>
     <PackageProjectUrl>https://github.com/eladser/AspNetDebugDashboard</PackageProjectUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>aspnetcore;debugging;dashboard;development;telescope;logging</PackageTags>
+    <PackageTags>aspnetcore;debugging;dashboard;development;telescope;logging;monitoring;efcore;sql;exceptions;requests;performance;developer-tools</PackageTags>
     <RepositoryUrl>https://github.com/eladser/AspNetDebugDashboard</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
+    <RepositoryBranch>main</RepositoryBranch>
     <PackageIcon>icon.png</PackageIcon>
+    <PackageReleaseNotes>
+      Initial release of ASP.NET Debug Dashboard.
+      
+      Features:
+      - HTTP request monitoring with real-time tracking
+      - SQL query analysis with Entity Framework Core integration
+      - Exception tracking with full stack traces
+      - Custom logging with structured data
+      - Beautiful modern dashboard with dark/light themes
+      - Export/import capabilities
+      - Performance metrics and insights
+      - Advanced search and filtering
+      - Zero-configuration setup
+    </PackageReleaseNotes>
     <IsPackable>true</IsPackable>
     <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <WarningsAsErrors />
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <DebugSymbols>true</DebugSymbols>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="7.0.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="7.0.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Diagnostics" Version="7.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="7.0.0" Condition="'$(TargetFramework)' == 'net7.0'" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.0" Condition="'$(TargetFramework)' == 'net8.0'" />
+    
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="7.0.0" Condition="'$(TargetFramework)' == 'net7.0'" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" Condition="'$(TargetFramework)' == 'net8.0'" />
+    
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Diagnostics" Version="7.0.0" Condition="'$(TargetFramework)' == 'net7.0'" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Diagnostics" Version="8.0.0" Condition="'$(TargetFramework)' == 'net8.0'" />
+    
     <PackageReference Include="LiteDB" Version="5.0.17" />
-    <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="7.0.0" />
-    <PackageReference Include="Microsoft.AspNetCore.SpaServices.Extensions" Version="7.0.0" />
+    
+    <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="7.0.0" Condition="'$(TargetFramework)' == 'net7.0'" />
+    <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="8.0.0" Condition="'$(TargetFramework)' == 'net8.0'" />
+    
+    <PackageReference Include="Microsoft.AspNetCore.SpaServices.Extensions" Version="7.0.0" Condition="'$(TargetFramework)' == 'net7.0'" />
+    <PackageReference Include="Microsoft.AspNetCore.SpaServices.Extensions" Version="8.0.0" Condition="'$(TargetFramework)' == 'net8.0'" />
+    
+    <PackageReference Include="System.Text.Json" Version="7.0.0" Condition="'$(TargetFramework)' == 'net7.0'" />
+    <PackageReference Include="System.Text.Json" Version="8.0.0" Condition="'$(TargetFramework)' == 'net8.0'" />
   </ItemGroup>
 
   <ItemGroup>
@@ -37,6 +82,10 @@
 
   <ItemGroup>
     <EmbeddedResource Include="wwwroot\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AspNetDebugDashboard.Tests" />
   </ItemGroup>
 
 </Project>
