@@ -7,6 +7,8 @@ using Microsoft.Extensions.Hosting;
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using Xunit;
+using Microsoft.AspNetCore.Builder;
 
 namespace AspNetDebugDashboard.Tests;
 
