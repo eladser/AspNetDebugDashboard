@@ -83,7 +83,7 @@ public class DebugDashboardService : IDebugDashboardService
         };
     }
     
-    public async Task ImportDataAsync(byte[] data, ExportFormat format)
+    public Task ImportDataAsync(byte[] data, ExportFormat format)
     {
         // Implementation for importing data
         throw new NotImplementedException("Import functionality not yet implemented");
