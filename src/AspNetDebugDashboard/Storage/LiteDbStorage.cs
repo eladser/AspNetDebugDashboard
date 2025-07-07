@@ -13,10 +13,12 @@ public class LiteDbStorage : IDebugStorage
     private readonly ILiteCollection<LogEntry> _logs;
     private readonly ILiteCollection<ExceptionEntry> _exceptions;
     private readonly DebugConfiguration _config;
+    private readonly string _connectionString;
 
     public LiteDbStorage(string connectionString, DebugConfiguration config)
     {
         _config = config;
+        _connectionString = connectionString;
         _database = new LiteDatabase(connectionString);
         
         _requests = _database.GetCollection<RequestEntry>("requests");
@@ -226,35 +228,36 @@ public class LiteDbStorage : IDebugStorage
             var totalLogs = _logs.Count();
             
             var avgResponseTime = _requests.Query()
-                .Select(x => x.ExecutionTimeMs)
                 .ToList()
+                .Select(x => (double)x.ExecutionTimeMs)
                 .DefaultIfEmpty(0)
                 .Average();
             
             var avgSqlTime = _sqlQueries.Query()
-                .Select(x => x.ExecutionTimeMs)
                 .ToList()
+                .Select(x => (double)x.ExecutionTimeMs)
                 .DefaultIfEmpty(0)
                 .Average();
             
             var statusCodes = _requests.Query()
+                .ToList()
                 .GroupBy(x => x.StatusCode)
-                .Select(g => new { StatusCode = g.Key, Count = g.Count() })
-                .ToDictionary(x => x.StatusCode, x => x.Count);
+                .ToDictionary(g => g.Key, g => g.Count());
             
             var methods = _requests.Query()
+                .ToList()
                 .GroupBy(x => x.Method)
-                .Select(g => new { Method = g.Key, Count = g.Count() })
-                .ToDictionary(x => x.Method, x => x.Count);
+                .ToDictionary(g => g.Key, g => g.Count());
             
             var exceptionTypes = _exceptions.Query()
+                .ToList()
                 .GroupBy(x => x.ExceptionType ?? "Unknown")
-                .Select(g => new { Type = g.Key, Count = g.Count() })
-                .ToDictionary(x => x.Type, x => x.Count);
+                .ToDictionary(g => g.Key, g => g.Count());
             
             var slowestRequests = _requests.Query()
                 .OrderBy(x => x.ExecutionTimeMs, Query.Descending)
                 .Limit(10)
+                .ToList()
                 .Select(x => new SlowRequest
                 {
                     Id = x.Id,
@@ -268,6 +271,7 @@ public class LiteDbStorage : IDebugStorage
             var slowestQueries = _sqlQueries.Query()
                 .OrderBy(x => x.ExecutionTimeMs, Query.Descending)
                 .Limit(10)
+                .ToList()
                 .Select(x => new SlowQuery
                 {
                     Id = x.Id,
@@ -493,7 +497,7 @@ public class LiteDbStorage : IDebugStorage
     {
         return await Task.Run(() =>
         {
-            var filePath = _database.ConnectionString.Replace("Filename=", "");
+            var filePath = _connectionString.Replace("Filename=", "");
             if (File.Exists(filePath))
             {
                 return new FileInfo(filePath).Length;
@@ -544,6 +548,7 @@ public class LiteDbStorage : IDebugStorage
             var oldestEntries = collection.Query()
                 .OrderBy(x => x.Timestamp)
                 .Limit(toDelete)
+                .ToList()
                 .Select(x => x.Id)
                 .ToList();
             
