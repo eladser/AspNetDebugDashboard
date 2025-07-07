@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace AspNetDebugDashboard.Services;
 
@@ -40,7 +41,7 @@ public class DebugDashboardCleanupService : BackgroundService
                 await PerformCleanupAsync();
                 
                 // Wait for the next cleanup cycle (default: 1 hour)
-                var delay = _config.CleanupInterval ?? TimeSpan.FromHours(1);
+                var delay = TimeSpan.FromHours(1);
                 await Task.Delay(delay, stoppingToken);
             }
             catch (OperationCanceledException)
@@ -75,18 +76,15 @@ public class DebugDashboardCleanupService : BackgroundService
 
             var cleanedItems = 0;
 
-            // 1. Clean by retention period
-            if (_config.RetentionPeriod.HasValue)
+            // 1. Clean by retention period (default: 7 days)
+            var cutoff = DateTime.UtcNow.Subtract(TimeSpan.FromDays(7));
+            var deletedByAge = await storage.DeleteOlderThanAsync(cutoff);
+            cleanedItems += deletedByAge;
+            
+            if (deletedByAge > 0)
             {
-                var cutoff = DateTime.UtcNow.Subtract(_config.RetentionPeriod.Value);
-                var deletedByAge = await storage.DeleteOlderThanAsync(cutoff);
-                cleanedItems += deletedByAge;
-                
-                if (deletedByAge > 0)
-                {
-                    _logger.LogInformation("Deleted {Count} entries older than {Cutoff}", 
-                        deletedByAge, cutoff);
-                }
+                _logger.LogInformation("Deleted {Count} entries older than {Cutoff}", 
+                    deletedByAge, cutoff);
             }
 
             // 2. Clean by max entries limit
@@ -108,11 +106,11 @@ public class DebugDashboardCleanupService : BackgroundService
                 cleanedItems, totalEntries, newTotalEntries, databaseSize, newDatabaseSize);
 
             // 5. Check if we need to alert about storage issues
-            if (newDatabaseSize > _config.MaxDatabaseSize)
+            if (newDatabaseSize > 100 * 1024 * 1024) // 100MB default limit
             {
                 _logger.LogWarning(
-                    "Database size ({CurrentSize} bytes) exceeds configured maximum ({MaxSize} bytes)",
-                    newDatabaseSize, _config.MaxDatabaseSize);
+                    "Database size ({CurrentSize} bytes) is getting large",
+                    newDatabaseSize);
             }
         }
         catch (Exception ex)
@@ -160,7 +158,7 @@ public class DebugDashboardHealthCheck : IHealthCheck
             
             // Test storage connectivity
             var stats = await _storage.GetStatsAsync();
-            var totalEntries = await storage.GetTotalEntriesAsync();
+            var totalEntries = await _storage.GetTotalEntriesAsync();
             var databaseSize = await _storage.GetDatabaseSizeAsync();
             
             stopwatch.Stop();
@@ -170,8 +168,7 @@ public class DebugDashboardHealthCheck : IHealthCheck
                 ["total_entries"] = totalEntries,
                 ["database_size_bytes"] = databaseSize,
                 ["response_time_ms"] = stopwatch.ElapsedMilliseconds,
-                ["max_entries"] = _config.MaxEntries,
-                ["retention_period"] = _config.RetentionPeriod?.ToString() ?? "None"
+                ["max_entries"] = _config.MaxEntries
             };
 
             // Check for warning conditions
@@ -182,7 +179,7 @@ public class DebugDashboardHealthCheck : IHealthCheck
                 warnings.Add($"Entry count ({totalEntries}) approaching limit ({_config.MaxEntries})");
             }
             
-            if (databaseSize > _config.MaxDatabaseSize * 0.9)
+            if (databaseSize > 100 * 1024 * 1024 * 0.9) // 90% of 100MB
             {
                 warnings.Add($"Database size approaching limit");
             }
