@@ -10,19 +10,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Add Entity Framework
-builder.Services.AddDbContext<SampleDbContext>(options =>
-{
-    options.UseInMemoryDatabase("SampleDb");
-    // Add the debug dashboard interceptor
-    options.AddDebugDashboard(builder.Services.BuildServiceProvider());
-});
-
-// Add sample services
-builder.Services.AddScoped<IProductService, ProductService>();
-builder.Services.AddScoped<IOrderService, OrderService>();
-
-// Add Debug Dashboard
+// Add Debug Dashboard first
 builder.Services.AddDebugDashboard(config =>
 {
     config.IsEnabled = true;
@@ -32,6 +20,18 @@ builder.Services.AddDebugDashboard(config =>
     config.LogExceptions = true;
     config.MaxEntries = 1000;
 });
+
+// Add Entity Framework
+builder.Services.AddDbContext<SampleDbContext>(options =>
+{
+    options.UseInMemoryDatabase("SampleDb");
+    // Add the debug dashboard interceptor without BuildServiceProvider
+    options.AddDebugDashboard();
+});
+
+// Add sample services
+builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddScoped<IOrderService, OrderService>();
 
 var app = builder.Build();
 
