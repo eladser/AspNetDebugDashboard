@@ -9,33 +9,17 @@ using System.Text;
 using System.Text.Json;
 using Xunit;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Configuration;
 
 namespace AspNetDebugDashboard.Tests;
 
-public class DebugDashboardIntegrationTests : IClassFixture<WebApplicationFactory<TestStartup>>
+public class DebugDashboardIntegrationTests : IClassFixture<TestWebApplicationFactory>
 {
-    private readonly WebApplicationFactory<TestStartup> _factory;
+    private readonly TestWebApplicationFactory _factory;
 
-    public DebugDashboardIntegrationTests(WebApplicationFactory<TestStartup> factory)
+    public DebugDashboardIntegrationTests(TestWebApplicationFactory factory)
     {
-        _factory = factory.WithWebHostBuilder(builder =>
-        {
-            builder.UseEnvironment("Development");
-            builder.ConfigureServices(services =>
-            {
-                services.AddDebugDashboard(options =>
-                {
-                    options.IsEnabled = true;
-                    options.LogRequestBodies = true;
-                    options.LogResponseBodies = true;
-                    options.LogSqlQueries = true;
-                    options.LogExceptions = true;
-                    options.DatabasePath = ":memory:"; // Use in-memory database for tests
-                    options.EnablePerformanceCounters = true;
-                    options.AllowDataExport = true;
-                });
-            });
-        });
+        _factory = factory;
     }
 
     [Fact]
@@ -405,32 +389,59 @@ public class DebugDashboardIntegrationTests : IClassFixture<WebApplicationFactor
     }
 }
 
-// Helper class for testing with a minimal web application
-public class TestStartup
+// Custom WebApplicationFactory for tests
+public class TestWebApplicationFactory : WebApplicationFactory<TestProgram>
 {
-    public void ConfigureServices(IServiceCollection services)
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        services.AddControllers();
-        services.AddDebugDashboard();
-    }
+        builder.UseEnvironment("Development");
+        
+        builder.ConfigureServices(services =>
+        {
+            services.AddDebugDashboard(options =>
+            {
+                options.IsEnabled = true;
+                options.LogRequestBodies = true;
+                options.LogResponseBodies = true;
+                options.LogSqlQueries = true;
+                options.LogExceptions = true;
+                options.DatabasePath = ":memory:"; // Use in-memory database for tests
+                options.EnablePerformanceCounters = true;
+                options.AllowDataExport = true;
+            });
+        });
 
-    public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
-    {
-        if (env.IsDevelopment())
+        builder.Configure(app =>
         {
             app.UseDebugDashboard();
-        }
-
-        app.UseRouting();
-        app.UseEndpoints(endpoints =>
-        {
-            endpoints.MapControllers();
-            endpoints.MapGet("/api/test", () => "Test endpoint");
-            endpoints.MapGet("/api/test-get", () => "GET test");
-            endpoints.MapPost("/api/test-post", () => "POST test");
-            endpoints.MapGet("/api/test1", () => "Test 1");
-            endpoints.MapGet("/api/test2", () => "Test 2");
-            endpoints.MapGet("/api/test-endpoint", () => "Test endpoint");
+            app.UseRouting();
+            app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapGet("/api/test", () => "Test endpoint");
+                endpoints.MapGet("/api/test-get", () => "GET test");
+                endpoints.MapPost("/api/test-post", () => "POST test");
+                endpoints.MapGet("/api/test1", () => "Test 1");
+                endpoints.MapGet("/api/test2", () => "Test 2");
+                endpoints.MapGet("/api/test-endpoint", () => "Test endpoint");
+            });
         });
+    }
+}
+
+// Simple Program class for testing
+public class TestProgram
+{
+    public static void Main(string[] args)
+    {
+        var builder = WebApplication.CreateBuilder(args);
+        
+        builder.Services.AddDebugDashboard();
+        
+        var app = builder.Build();
+        
+        app.UseDebugDashboard();
+        app.UseRouting();
+        
+        app.Run();
     }
 }
