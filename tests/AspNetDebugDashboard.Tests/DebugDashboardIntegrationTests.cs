@@ -8,7 +8,6 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using Xunit;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace AspNetDebugDashboard.Tests;
@@ -237,67 +236,17 @@ public class DebugDashboardIntegrationTests : IClassFixture<TestWebApplicationFa
     }
 }
 
-// Test WebApplicationFactory that creates a minimal test app
-public class TestWebApplicationFactory : WebApplicationFactory<TestProgram>
+// Simplified test factory using the Program class
+public class TestWebApplicationFactory : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
-        builder.UseContentRoot(Directory.GetCurrentDirectory());
         
+        // Override configurations for testing if needed
         builder.ConfigureServices(services =>
         {
-            services.Configure<HealthCheckServiceOptions>(options =>
-            {
-                options.Registrations.Clear();
-            });
-            
-            services.AddDebugDashboard(options =>
-            {
-                options.DatabasePath = $":memory:{Guid.NewGuid()}";
-                options.IsEnabled = true;
-                options.LogRequestBodies = true;
-                options.LogResponseBodies = true;
-                options.LogSqlQueries = true;
-                options.LogExceptions = true;
-                options.EnablePerformanceCounters = true;
-                options.AllowDataExport = true;
-                options.MaxEntries = 1000;
-            });
-        });
-        
-        builder.UseStartup<TestStartup>();
-    }
-
-    protected override IHost CreateHost(IHostBuilder builder)
-    {
-        builder.UseEnvironment("Development");
-        return base.CreateHost(builder);
-    }
-}
-
-// Minimal test startup class
-public class TestStartup
-{
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.AddRouting();
-        services.AddControllers();
-    }
-
-    public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
-    {
-        app.UseRouting();
-        app.UseDebugDashboard();
-        
-        app.UseEndpoints(endpoints =>
-        {
-            endpoints.MapGet("/test", async context =>
-            {
-                await context.Response.WriteAsync("Test endpoint");
-            });
-            
-            endpoints.MapControllers();
+            // Additional test-specific service configurations can go here
         });
     }
 }
