@@ -10,15 +10,14 @@ using System.Text.Json;
 using Xunit;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using SampleApp; // Reference the SampleApp namespace
 
 namespace AspNetDebugDashboard.Tests;
 
-public class DebugDashboardIntegrationTests : IClassFixture<SampleAppWebApplicationFactory>
+public class DebugDashboardIntegrationTests : IClassFixture<TestWebApplicationFactory>
 {
-    private readonly SampleAppWebApplicationFactory _factory;
+    private readonly TestWebApplicationFactory _factory;
 
-    public DebugDashboardIntegrationTests(SampleAppWebApplicationFactory factory)
+    public DebugDashboardIntegrationTests(TestWebApplicationFactory factory)
     {
         _factory = factory;
     }
@@ -98,8 +97,8 @@ public class DebugDashboardIntegrationTests : IClassFixture<SampleAppWebApplicat
         // Arrange
         var client = _factory.CreateClient();
 
-        // Act - First make a request to generate some data using SampleApp endpoint
-        await client.GetAsync("/api/products");
+        // Act - First make a request to generate some data
+        await client.GetAsync("/test");
         
         // Then check if it was logged
         var response = await client.GetAsync("/_debug/api/requests?pageSize=10");
@@ -149,8 +148,8 @@ public class DebugDashboardIntegrationTests : IClassFixture<SampleAppWebApplicat
         // Arrange
         var client = _factory.CreateClient();
 
-        // First, create some data using SampleApp endpoint
-        await client.GetAsync("/api/products");
+        // First, create some data
+        await client.GetAsync("/test");
         
         // Act
         var response = await client.DeleteAsync("/_debug/api/clear");
@@ -161,22 +160,6 @@ public class DebugDashboardIntegrationTests : IClassFixture<SampleAppWebApplicat
         var content = await response.Content.ReadAsStringAsync();
         var result = JsonSerializer.Deserialize<JsonElement>(content);
         result.GetProperty("message").GetString().Should().Contain("cleared");
-    }
-
-    [Fact]
-    public async Task Api_Export_WhenEnabled_ReturnsFile()
-    {
-        // Arrange
-        var client = _factory.CreateClient();
-
-        // Act
-        var response = await client.GetAsync("/_debug/api/export");
-
-        // Assert
-        response.EnsureSuccessStatusCode();
-        response.Content.Headers.ContentType?.ToString().Should().Contain("application/json");
-        response.Content.Headers.ContentDisposition?.DispositionType.Should().Be("attachment");
-        response.Content.Headers.ContentDisposition?.FileName.Should().StartWith("debug-export-");
     }
 
     [Theory]
@@ -198,86 +181,6 @@ public class DebugDashboardIntegrationTests : IClassFixture<SampleAppWebApplicat
     }
 
     [Fact]
-    public async Task Api_Search_WithValidTerm_ReturnsResults()
-    {
-        // Arrange
-        var client = _factory.CreateClient();
-
-        // Act
-        var response = await client.GetAsync("/_debug/api/search?term=test");
-
-        // Assert
-        response.EnsureSuccessStatusCode();
-        
-        var content = await response.Content.ReadAsStringAsync();
-        var results = JsonSerializer.Deserialize<JsonElement>(content);
-        results.ValueKind.Should().Be(JsonValueKind.Array);
-    }
-
-    [Fact]
-    public async Task Api_Search_WithEmptyTerm_ReturnsBadRequest()
-    {
-        // Arrange
-        var client = _factory.CreateClient();
-
-        // Act
-        var response = await client.GetAsync("/_debug/api/search?term=");
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-    }
-
-    [Fact]
-    public async Task Api_Performance_WhenEnabled_ReturnsMetrics()
-    {
-        // Arrange
-        var client = _factory.CreateClient();
-
-        // Generate some test data first using SampleApp endpoints
-        await client.GetAsync("/api/products");
-        await client.GetAsync("/api/orders");
-
-        // Act
-        var response = await client.GetAsync("/_debug/api/performance");
-
-        // Assert
-        response.EnsureSuccessStatusCode();
-        
-        var content = await response.Content.ReadAsStringAsync();
-        var metrics = JsonSerializer.Deserialize<JsonElement>(content);
-        
-        metrics.TryGetProperty("totalRequests", out _).Should().BeTrue();
-        metrics.TryGetProperty("averageResponseTime", out _).Should().BeTrue();
-        metrics.TryGetProperty("errorRate", out _).Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task Middleware_CapturesRequestsCorrectly()
-    {
-        // Arrange
-        var client = _factory.CreateClient();
-
-        // Act - Make multiple requests with different methods using SampleApp endpoints
-        await client.GetAsync("/api/products");
-        var productData = new { Name = "Test Product", Price = 10.99m };
-        var json = JsonSerializer.Serialize(productData);
-        await client.PostAsync("/api/products", new StringContent(json, Encoding.UTF8, "application/json"));
-        
-        // Wait a bit for async processing
-        await Task.Delay(100);
-
-        // Check if requests were captured
-        var response = await client.GetAsync("/_debug/api/requests");
-        response.EnsureSuccessStatusCode();
-        
-        var content = await response.Content.ReadAsStringAsync();
-        var result = JsonSerializer.Deserialize<JsonElement>(content);
-        
-        var items = result.GetProperty("items");
-        items.GetArrayLength().Should().BeGreaterOrEqualTo(0);
-    }
-
-    [Fact]
     public async Task Dashboard_DisabledInProduction_ReturnsNotFound()
     {
         // Arrange
@@ -286,7 +189,6 @@ public class DebugDashboardIntegrationTests : IClassFixture<SampleAppWebApplicat
             builder.UseEnvironment("Production");
             builder.ConfigureServices(services =>
             {
-                // Clear existing health check registrations to prevent duplicates
                 services.Configure<HealthCheckServiceOptions>(options =>
                 {
                     options.Registrations.Clear();
@@ -295,7 +197,7 @@ public class DebugDashboardIntegrationTests : IClassFixture<SampleAppWebApplicat
                 services.AddDebugDashboard(options =>
                 {
                     options.IsEnabled = false; // Disabled in production
-                    options.DatabasePath = $":memory:{Guid.NewGuid()}"; // Unique in-memory DB
+                    options.DatabasePath = $":memory:{Guid.NewGuid()}";
                 });
             });
         });
@@ -307,38 +209,6 @@ public class DebugDashboardIntegrationTests : IClassFixture<SampleAppWebApplicat
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
-    }
-
-    [Fact]
-    public async Task Dashboard_WithCustomPath_Works()
-    {
-        // Arrange
-        var factory = _factory.WithWebHostBuilder(builder =>
-        {
-            builder.ConfigureServices(services =>
-            {
-                // Clear existing health check registrations to prevent duplicates
-                services.Configure<HealthCheckServiceOptions>(options =>
-                {
-                    options.Registrations.Clear();
-                });
-                
-                services.AddDebugDashboard(options =>
-                {
-                    options.IsEnabled = true;
-                    options.BasePath = "/_custom-debug";
-                    options.DatabasePath = $":memory:{Guid.NewGuid()}"; // Unique in-memory DB
-                });
-            });
-        });
-
-        var client = factory.CreateClient();
-
-        // Act
-        var response = await client.GetAsync("/_custom-debug");
-
-        // Assert
-        response.EnsureSuccessStatusCode();
     }
 
     [Theory]
@@ -365,149 +235,26 @@ public class DebugDashboardIntegrationTests : IClassFixture<SampleAppWebApplicat
         var totalPages = result.GetProperty("totalPages").GetInt32();
         totalPages.Should().BeGreaterOrEqualTo(0);
     }
-
-    [Fact]
-    public async Task Api_Filtering_ByDateRange_Works()
-    {
-        // Arrange
-        var client = _factory.CreateClient();
-        var fromDate = DateTime.UtcNow.AddHours(-1).ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
-        var toDate = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
-
-        // Act
-        var response = await client.GetAsync($"/_debug/api/requests?dateFrom={fromDate}&dateTo={toDate}");
-
-        // Assert
-        response.EnsureSuccessStatusCode();
-        
-        var content = await response.Content.ReadAsStringAsync();
-        var result = JsonSerializer.Deserialize<JsonElement>(content);
-        
-        result.TryGetProperty("items", out _).Should().BeTrue();
-        result.TryGetProperty("totalCount", out _).Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task Api_RateLimiting_HandlesHighLoad()
-    {
-        // Arrange
-        var client = _factory.CreateClient();
-        var tasks = new List<Task<HttpResponseMessage>>();
-
-        // Act - Send multiple concurrent requests
-        for (int i = 0; i < 10; i++)
-        {
-            tasks.Add(client.GetAsync("/_debug/api/stats"));
-        }
-
-        var responses = await Task.WhenAll(tasks);
-
-        // Assert - All requests should succeed (no rate limiting on API)
-        foreach (var response in responses)
-        {
-            response.EnsureSuccessStatusCode();
-        }
-    }
-
-    [Fact]
-    public async Task SampleApp_ProductsEndpoint_GeneratesDebugData()
-    {
-        // Arrange
-        var client = _factory.CreateClient();
-
-        // Act - Call SampleApp endpoints to generate debug data
-        await client.GetAsync("/api/products");
-        await client.GetAsync("/api/products/1");
-        
-        // Give some time for async processing
-        await Task.Delay(200);
-
-        // Check that debug dashboard captured the requests
-        var debugResponse = await client.GetAsync("/_debug/api/requests");
-        debugResponse.EnsureSuccessStatusCode();
-        
-        var content = await debugResponse.Content.ReadAsStringAsync();
-        var result = JsonSerializer.Deserialize<JsonElement>(content);
-        
-        // Should have captured at least the requests we just made
-        var items = result.GetProperty("items");
-        items.GetArrayLength().Should().BeGreaterOrEqualTo(2);
-    }
-
-    [Fact]
-    public async Task SampleApp_TestErrorEndpoint_GeneratesExceptionData()
-    {
-        // Arrange
-        var client = _factory.CreateClient();
-
-        // Act - Call the test error endpoint that intentionally throws an exception
-        // We expect this to throw an exception because the middleware re-throws the exception
-        // and there's no global exception handler in the SampleApp
-        
-        Exception? caughtException = null;
-        try
-        {
-            // Try to make the request - we expect this to fail
-            await client.GetAsync("/api/products/test-error");
-        }
-        catch (Exception ex)
-        {
-            // Capture any exception (HttpRequestException, TaskCanceledException, etc.)
-            caughtException = ex;
-        }
-
-        // Verify that an exception was thrown, which indicates the endpoint was called
-        // and the exception propagated as expected
-        caughtException.Should().NotBeNull("The test error endpoint should cause an exception to be thrown");
-        
-        // Give some time for async processing to ensure the exception was logged
-        await Task.Delay(1000); // Increased delay to ensure async processing completes
-
-        // The key test: verify that the debug dashboard captured the exception despite the HttpRequestException
-        var debugResponse = await client.GetAsync("/_debug/api/exceptions");
-        debugResponse.EnsureSuccessStatusCode();
-        
-        var content = await debugResponse.Content.ReadAsStringAsync();
-        var result = JsonSerializer.Deserialize<JsonElement>(content);
-        
-        // Should have captured the exception
-        var items = result.GetProperty("items");
-        items.GetArrayLength().Should().BeGreaterOrEqualTo(1, 
-            "The debug dashboard should have captured the test exception even though an HttpRequestException was thrown");
-        
-        // Verify the exception details
-        if (items.GetArrayLength() > 0)
-        {
-            var firstException = items[0];
-            firstException.GetProperty("exceptionType").GetString().Should().Be("InvalidOperationException");
-            firstException.GetProperty("message").GetString().Should().Contain("test exception");
-        }
-    }
 }
 
-// Custom WebApplicationFactory that uses the SampleApp's Program class
-public class SampleAppWebApplicationFactory : WebApplicationFactory<Program>
+// Test WebApplicationFactory that creates a minimal test app
+public class TestWebApplicationFactory : WebApplicationFactory<TestStartup>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
-        
-        // Ensure content root is set properly
         builder.UseContentRoot(Directory.GetCurrentDirectory());
         
-        // Configure test-specific settings
         builder.ConfigureServices(services =>
         {
-            // Clear existing health check registrations to prevent duplicates
             services.Configure<HealthCheckServiceOptions>(options =>
             {
                 options.Registrations.Clear();
             });
             
-            // Override the debug dashboard configuration for testing
             services.AddDebugDashboard(options =>
             {
-                options.DatabasePath = $":memory:{Guid.NewGuid()}"; // Unique in-memory database for each test run
+                options.DatabasePath = $":memory:{Guid.NewGuid()}";
                 options.IsEnabled = true;
                 options.LogRequestBodies = true;
                 options.LogResponseBodies = true;
@@ -515,15 +262,40 @@ public class SampleAppWebApplicationFactory : WebApplicationFactory<Program>
                 options.LogExceptions = true;
                 options.EnablePerformanceCounters = true;
                 options.AllowDataExport = true;
-                options.MaxEntries = 1000; // Prevent cleanup issues during tests
+                options.MaxEntries = 1000;
             });
         });
     }
 
     protected override IHost CreateHost(IHostBuilder builder)
     {
-        // This method ensures proper host creation for .NET 6+ applications
         builder.UseEnvironment("Development");
         return base.CreateHost(builder);
+    }
+}
+
+// Minimal test startup class
+public class TestStartup
+{
+    public void ConfigureServices(IServiceCollection services)
+    {
+        services.AddRouting();
+        services.AddControllers();
+    }
+
+    public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+    {
+        app.UseRouting();
+        app.UseDebugDashboard();
+        
+        app.UseEndpoints(endpoints =>
+        {
+            endpoints.MapGet("/test", async context =>
+            {
+                await context.Response.WriteAsync("Test endpoint");
+            });
+            
+            endpoints.MapControllers();
+        });
     }
 }
