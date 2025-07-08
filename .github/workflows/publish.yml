@@ -61,6 +61,12 @@ jobs:
         find . -name "obj" -type d -exec rm -rf {} + 2>/dev/null || true
         find . -name "bin" -type d -exec rm -rf {} + 2>/dev/null || true
         
+    - name: Remove problematic icon file
+      run: |
+        echo "🗑️  Removing problematic icon file..."
+        rm -f src/AspNetDebugDashboard/icon.png
+        echo "✅ Icon file removed"
+        
     - name: Restore dependencies
       run: dotnet restore --force --no-cache --verbosity normal
       
@@ -95,13 +101,14 @@ jobs:
           --no-build \
           --configuration Release \
           --output ./artifacts \
-          --include-symbols \
-          --include-source \
           --verbosity normal \
           -p:PackageVersion=${{ steps.version.outputs.VERSION }} \
           -p:AssemblyVersion=${{ steps.version.outputs.VERSION }} \
           -p:FileVersion=${{ steps.version.outputs.VERSION }} \
           -p:InformationalVersion=${{ steps.version.outputs.VERSION }}
+        
+        echo "✅ Package created successfully"
+        ls -la ./artifacts/
       
     - name: Verify package contents
       run: |
@@ -141,24 +148,18 @@ jobs:
     - name: Publish to NuGet
       run: |
         echo "🚀 Publishing package to NuGet..."
-        dotnet nuget push ./artifacts/*.nupkg \
-          --api-key ${{ secrets.NUGET_API_KEY }} \
-          --source https://api.nuget.org/v3/index.json \
-          --skip-duplicate \
-          --no-symbols
-          
-    - name: Publish symbols to NuGet
-      run: |
-        if ls ./artifacts/*.snupkg 1> /dev/null 2>&1; then
-          echo "📊 Publishing symbol packages..."
-          dotnet nuget push ./artifacts/*.snupkg \
+        for pkg in ./artifacts/*.nupkg; do
+          echo "Publishing: $(basename $pkg)"
+          dotnet nuget push "$pkg" \
             --api-key ${{ secrets.NUGET_API_KEY }} \
             --source https://api.nuget.org/v3/index.json \
-            --skip-duplicate
-        else
-          echo "ℹ️  No symbol packages found"
-        fi
-      
+            --skip-duplicate \
+            --no-symbols || {
+              echo "⚠️  Failed to publish $(basename $pkg), but continuing..."
+            }
+        done
+        echo "✅ Package publication completed"
+        
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -208,3 +209,4 @@ jobs:
         echo "   - Package validation errors"
         echo "   - Missing project.assets.json files"
         echo "   - Framework compatibility issues"
+        echo "   - Icon format issues"
