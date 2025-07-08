@@ -10,6 +10,11 @@ env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
 
+permissions:
+  contents: write
+  packages: write
+  actions: read
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -102,13 +107,15 @@ jobs:
             --source https://api.nuget.org/v3/index.json \
             --api-key ${{ secrets.NUGET_API_KEY }} \
             --skip-duplicate || {
-              echo "⚠️  Failed to publish $(basename $pkg), but continuing..."
+              echo "⚠️  Package may already exist, continuing..."
             }
         done
-        echo "✅ Package publication completed"
+        echo "✅ Package publication step completed"
     
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         name: Release ${{ steps.get_version.outputs.VERSION }}
         body: |
@@ -162,7 +169,6 @@ jobs:
         draft: false
         prerelease: ${{ contains(steps.get_version.outputs.VERSION, '-') }}
         files: ./artifacts/*.nupkg
-        token: ${{ secrets.GITHUB_TOKEN }}
     
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
