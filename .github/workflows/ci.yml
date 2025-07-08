@@ -28,7 +28,7 @@ jobs:
       with:
         dotnet-version: ${{ matrix.dotnet-version }}
         
-    - name: Create temporary global.json
+    - name: Create temporary global.json for matrix version
       run: echo '{"sdk":{"version":"${{ steps.setup-dotnet.outputs.dotnet-version }}","rollForward":"latestFeature"}}' > ./global.json
         
     - name: Cache NuGet packages
@@ -69,7 +69,7 @@ jobs:
           7.0.x
           8.0.x
     
-    - name: Create global.json for multi-targeting
+    - name: Create global.json for multi-targeting (use latest)
       run: echo '{"sdk":{"version":"8.0.x","rollForward":"latestFeature"}}' > ./global.json
     
     - name: Restore dependencies
