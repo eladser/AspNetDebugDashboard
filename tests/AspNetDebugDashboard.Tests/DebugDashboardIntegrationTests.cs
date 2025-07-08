@@ -238,7 +238,7 @@ public class DebugDashboardIntegrationTests : IClassFixture<TestWebApplicationFa
 }
 
 // Test WebApplicationFactory that creates a minimal test app
-public class TestWebApplicationFactory : WebApplicationFactory<TestStartup>
+public class TestWebApplicationFactory : WebApplicationFactory<TestProgram>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -265,6 +265,8 @@ public class TestWebApplicationFactory : WebApplicationFactory<TestStartup>
                 options.MaxEntries = 1000;
             });
         });
+        
+        builder.UseStartup<TestStartup>();
     }
 
     protected override IHost CreateHost(IHostBuilder builder)
