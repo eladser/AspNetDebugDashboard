@@ -15,55 +15,85 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
     
     - name: Get version from tag
       id: get_version
-      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/v}
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "📦 Release version: $VERSION"
     
-    - name: Setup .NET (Multi-target)
+    - name: Setup .NET 8.0
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: |
-          7.0.x
-          8.0.x
+        dotnet-version: '8.0.x'
     
-    - name: Create global.json for multi-targeting
-      run: echo '{"sdk":{"version":"8.0.x","rollForward":"latestFeature"}}' > ./global.json
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+    
+    - name: Clean solution
+      run: |
+        dotnet clean
+        find . -name "obj" -type d -exec rm -rf {} + 2>/dev/null || true
+        find . -name "bin" -type d -exec rm -rf {} + 2>/dev/null || true
     
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore --force --no-cache --verbosity normal
     
-    - name: Build
-      run: dotnet build --configuration Release --no-restore
+    - name: Build solution
+      run: dotnet build --configuration Release --no-restore --verbosity normal
     
-    - name: Test
-      run: dotnet test --configuration Release --no-build --verbosity normal
+    - name: Run tests
+      run: dotnet test --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage"
     
     - name: Update version in csproj
       run: |
+        echo "🔄 Updating version in project file..."
         sed -i "s/<Version>.*<\\/Version>/<Version>${{ steps.get_version.outputs.VERSION }}<\\/Version>/" src/AspNetDebugDashboard/AspNetDebugDashboard.csproj
         sed -i "s/<AssemblyVersion>.*<\\/AssemblyVersion>/<AssemblyVersion>${{ steps.get_version.outputs.VERSION }}<\\/AssemblyVersion>/" src/AspNetDebugDashboard/AspNetDebugDashboard.csproj
         sed -i "s/<FileVersion>.*<\\/FileVersion>/<FileVersion>${{ steps.get_version.outputs.VERSION }}<\\/FileVersion>/" src/AspNetDebugDashboard/AspNetDebugDashboard.csproj
+        
+        echo "✅ Version updated in project file"
+        echo "📋 Current version info:"
+        grep -E "<(Version|AssemblyVersion|FileVersion)>" src/AspNetDebugDashboard/AspNetDebugDashboard.csproj
     
-    - name: Pack
-      run: dotnet pack src/AspNetDebugDashboard/AspNetDebugDashboard.csproj --configuration Release --no-build --output ./artifacts
+    - name: Pack NuGet package
+      run: |
+        echo "📦 Creating NuGet package..."
+        dotnet pack src/AspNetDebugDashboard/AspNetDebugDashboard.csproj \
+          --configuration Release \
+          --no-build \
+          --output ./artifacts \
+          --include-symbols \
+          --include-source \
+          --verbosity normal
+        
+        echo "✅ Package created successfully"
+        ls -la ./artifacts/
     
     - name: Publish to NuGet
-      run: dotnet nuget push ./artifacts/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
-    
-    - name: Remove temporary global.json
-      run: rm -f ./global.json
+      run: |
+        echo "🚀 Publishing to NuGet..."
+        dotnet nuget push ./artifacts/*.nupkg \
+          --source https://api.nuget.org/v3/index.json \
+          --api-key ${{ secrets.NUGET_API_KEY }} \
+          --skip-duplicate
+        
+        echo "✅ Package published to NuGet"
     
     - name: Create GitHub Release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v2
       with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ steps.get_version.outputs.VERSION }}
+        name: Release ${{ steps.get_version.outputs.VERSION }}
         body: |
           ## 🎉 ASP.NET Debug Dashboard v${{ steps.get_version.outputs.VERSION }}
           
@@ -106,20 +136,23 @@ jobs:
           
           ### 📦 Requirements
           
-          - .NET 7.0 or 8.0
-          - ASP.NET Core 7.0+
+          - **.NET 8.0** (recommended)
+          - **ASP.NET Core 8.0+**
           
           **Transform your debugging experience today!** 🚀
           
           For full changelog, see [CHANGELOG.md](https://github.com/eladser/AspNetDebugDashboard/blob/main/CHANGELOG.md)
         draft: false
         prerelease: ${{ contains(steps.get_version.outputs.VERSION, '-') }}
+        files: ./artifacts/*.nupkg
+        token: ${{ secrets.GITHUB_TOKEN }}
     
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: nuget-package-${{ steps.get_version.outputs.VERSION }}
         path: ./artifacts/*.nupkg
+        retention-days: 30
 
   notify:
     runs-on: ubuntu-latest
@@ -133,3 +166,4 @@ jobs:
         echo "📦 Package published to NuGet"
         echo "📋 GitHub release created"
         echo "🔗 Available at: https://www.nuget.org/packages/AspNetDebugDashboard/"
+        echo "🎯 Target Framework: .NET 8.0"
