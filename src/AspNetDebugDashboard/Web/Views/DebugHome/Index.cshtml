@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASP.NET Debug Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .debug-dashboard {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+        
+        .code-block {
+            background: #1a1a1a;
+            color: #e5e7eb;
+            border-radius: 12px;
+            padding: 1.25rem;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', 'Consolas', monospace;
+            font-size: 0.875rem;
+            line-height: 1.6;
+            border: 1px solid #374151;
+        }
+        
+        .glass-effect {
+            backdrop-filter: blur(20px);
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .dark .glass-effect {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .status-200 { @apply bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300; }
+        .status-300 { @apply bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300; }
+        .status-400 { @apply bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300; }
+        .status-500 { @apply bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300; }
+        
+        .method-get { @apply bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300; }
+        .method-post { @apply bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300; }
+        .method-put { @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300; }
+        .method-delete { @apply bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300; }
+        .method-patch { @apply bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300; }
+        
+        .level-info { @apply bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300; }
+        .level-warning { @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300; }
+        .level-error { @apply bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300; }
+        .level-success { @apply bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300; }
+        
+        .animate-slide-in {
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        
+        .card-hover {
+            transition: all 0.2s ease;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .dark .card-hover:hover {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .dark .gradient-bg {
+            background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#eff6ff',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            900: '#1e3a8a'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 debug-dashboard transition-colors duration-300">
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect, useCallback, useMemo } = React;
+        
+        function DebugDashboard() {
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [darkMode, setDarkMode] = useState(localStorage.getItem('darkMode') === 'true');
+            const [stats, setStats] = useState(null);
+            const [requests, setRequests] = useState({ items: [], totalCount: 0 });
+            const [queries, setQueries] = useState({ items: [], totalCount: 0 });
+            const [logs, setLogs] = useState({ items: [], totalCount: 0 });
+            const [exceptions, setExceptions] = useState({ items: [], totalCount: 0 });
+            const [loading, setLoading] = useState(false);
+            const [searchTerm, setSearchTerm] = useState('');
+            const [autoRefresh, setAutoRefresh] = useState(true);
+            const [refreshInterval, setRefreshInterval] = useState(5000);
+            const [sidebarOpen, setSidebarOpen] = useState(false);
+            const [filter, setFilter] = useState({
+                page: 1,
+                pageSize: 50,
+                sortBy: 'timestamp',
+                sortDescending: true,
+                statusCode: '',
+                method: '',
+                level: '',
+                dateFrom: '',
+                dateTo: ''
+            });
+            
+            // Apply dark mode
+            useEffect(() => {
+                if (darkMode) {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+                localStorage.setItem('darkMode', darkMode);
+            }, [darkMode]);
+            
+            const fetchStats = useCallback(async () => {
+                try {
+                    const response = await fetch('/_debug/api/stats');
+                    if (response.ok) {
+                        const data = await response.json();
+                        setStats(data);
+                    }
+                } catch (error) {
+                    console.error('Error fetching stats:', error);
+                }
+            }, []);
+            
+            const fetchRequests = useCallback(async () => {
+                try {
+                    setLoading(true);
+                    const params = new URLSearchParams(filter);
+                    if (searchTerm) params.append('search', searchTerm);
+                    const response = await fetch(`/_debug/api/requests?${params}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        setRequests(data);
+                    }
+                } catch (error) {
+                    console.error('Error fetching requests:', error);
+                } finally {
+                    setLoading(false);
+                }
+            }, [filter, searchTerm]);
+            
+            const fetchQueries = useCallback(async () => {
+                try {
+                    setLoading(true);
+                    const params = new URLSearchParams(filter);
+                    if (searchTerm) params.append('search', searchTerm);
+                    const response = await fetch(`/_debug/api/queries?${params}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        setQueries(data);
+                    }
+                } catch (error) {
+                    console.error('Error fetching queries:', error);
+                } finally {
+                    setLoading(false);
+                }
+            }, [filter, searchTerm]);
+            
+            const fetchLogs = useCallback(async () => {
+                try {
+                    setLoading(true);
+                    const params = new URLSearchParams(filter);
+                    if (searchTerm) params.append('search', searchTerm);
+                    const response = await fetch(`/_debug/api/logs?${params}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        setLogs(data);
+                    }
+                } catch (error) {
+                    console.error('Error fetching logs:', error);
+                } finally {
+                    setLoading(false);
+                }
+            }, [filter, searchTerm]);
+            
+            const fetchExceptions = useCallback(async () => {
+                try {
+                    setLoading(true);
+                    const params = new URLSearchParams(filter);
+                    if (searchTerm) params.append('search', searchTerm);
+                    const response = await fetch(`/_debug/api/exceptions?${params}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        setExceptions(data);
+                    }
+                } catch (error) {
+                    console.error('Error fetching exceptions:', error);
+                } finally {
+                    setLoading(false);
+                }
+            }, [filter, searchTerm]);
+            
+            const clearAll = async () => {
+                if (confirm('Are you sure you want to clear all debug data?')) {
+                    try {
+                        await fetch('/_debug/api/clear', { method: 'DELETE' });
+                        fetchStats();
+                        if (activeTab === 'requests') fetchRequests();
+                        if (activeTab === 'queries') fetchQueries();
+                        if (activeTab === 'logs') fetchLogs();
+                        if (activeTab === 'exceptions') fetchExceptions();
+                    } catch (error) {
+                        console.error('Error clearing data:', error);
+                    }
+                }
+            };
+            
+            const exportData = async () => {
+                try {
+                    const response = await fetch('/_debug/api/export');
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `debug-data-${new Date().toISOString().split('T')[0]}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                } catch (error) {
+                    console.error('Error exporting data:', error);
+                }
+            };
+            
+            // Auto-refresh functionality
+            useEffect(() => {
+                fetchStats();
+                if (autoRefresh) {
+                    const interval = setInterval(fetchStats, refreshInterval);
+                    return () => clearInterval(interval);
+                }
+            }, [fetchStats, autoRefresh, refreshInterval]);
+            
+            // Fetch data based on active tab
+            useEffect(() => {
+                if (activeTab === 'requests') fetchRequests();
+                if (activeTab === 'queries') fetchQueries();
+                if (activeTab === 'logs') fetchLogs();
+                if (activeTab === 'exceptions') fetchExceptions();
+            }, [activeTab, fetchRequests, fetchQueries, fetchLogs, fetchExceptions]);
+            
+            const formatDate = (dateString) => {
+                return new Date(dateString).toLocaleString();
+            };
+            
+            const getStatusClass = (statusCode) => {
+                if (statusCode >= 200 && statusCode < 300) return 'status-200';
+                if (statusCode >= 300 && statusCode < 400) return 'status-300';
+                if (statusCode >= 400 && statusCode < 500) return 'status-400';
+                if (statusCode >= 500) return 'status-500';
+                return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+            };
+            
+            const getMethodClass = (method) => {
+                return `method-${method.toLowerCase()}`;
+            };
+            
+            const getLevelClass = (level) => {
+                return `level-${level.toLowerCase()}`;
+            };
+            
+            const navigationItems = [
+                { id: 'dashboard', label: 'Dashboard', icon: 'fa-chart-line' },
+                { id: 'requests', label: 'Requests', icon: 'fa-globe' },
+                { id: 'queries', label: 'SQL Queries', icon: 'fa-database' },
+                { id: 'logs', label: 'Logs', icon: 'fa-file-alt' },
+                { id: 'exceptions', label: 'Exceptions', icon: 'fa-exclamation-triangle' }
+            ];
+            
+            const StatsCard = ({ title, value, icon, color, change }) => (
+                <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 card-hover border-l-4 border-${color}-500`}>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
+                            <p className="text-3xl font-bold text-gray-900 dark:text-white">{value}</p>
+                            {change && (
+                                <p className={`text-sm mt-1 ${change > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {change > 0 ? '+' : ''}{change}%
+                                </p>
+                            )}
+                        </div>
+                        <div className={`p-3 rounded-full bg-${color}-100 dark:bg-${color}-900/30`}>
+                            <i className={`fas ${icon} text-${color}-600 dark:text-${color}-400 text-xl`}></i>
+                        </div>
+                    </div>
+                </div>
+            );
+            
+            const LoadingSpinner = () => (
+                <div className="flex items-center justify-center p-8">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                </div>
+            );
+            
+            const SearchBar = () => (
+                <div className="relative flex-1 max-w-md">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i className="fas fa-search text-gray-400"></i>
+                    </div>
+                    <input
+                        type="text"
+                        placeholder="Search..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                </div>
+            );
+            
+            return (
+                <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+                    {/* Header */}
+                    <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                            <div className="flex justify-between items-center py-4">
+                                <div className="flex items-center">
+                                    <button
+                                        onClick={() => setSidebarOpen(!sidebarOpen)}
+                                        className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+                                    >
+                                        <i className="fas fa-bars"></i>
+                                    </button>
+                                    <div className="ml-4 lg:ml-0">
+                                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">ASP.NET Debug Dashboard</h1>
+                                        <p className="text-gray-600 dark:text-gray-400">Real-time debugging and monitoring</p>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex items-center space-x-4">
+                                    <SearchBar />
+                                    
+                                    <div className="flex items-center space-x-2">
+                                        <span className="text-sm text-gray-600 dark:text-gray-400">Auto-refresh</span>
+                                        <button
+                                            onClick={() => setAutoRefresh(!autoRefresh)}
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                                autoRefresh ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'
+                                            }`}
+                                        >
+                                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                                autoRefresh ? 'translate-x-6' : 'translate-x-1'
+                                            }`} />
+                                        </button>
+                                    </div>
+                                    
+                                    <button
+                                        onClick={() => setDarkMode(!darkMode)}
+                                        className="p-2 rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        <i className={`fas ${darkMode ? 'fa-sun' : 'fa-moon'}`}></i>
+                                    </button>
+                                    
+                                    <button
+                                        onClick={exportData}
+                                        className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                                    >
+                                        <i className="fas fa-download mr-2"></i>Export
+                                    </button>
+                                    
+                                    <button
+                                        onClick={() => window.location.reload()}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                                    >
+                                        <i className="fas fa-refresh mr-2"></i>Refresh
+                                    </button>
+                                    
+                                    <button
+                                        onClick={clearAll}
+                                        className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                                    >
+                                        <i className="fas fa-trash mr-2"></i>Clear All
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                        {/* Navigation Tabs */}
+                        <div className="flex space-x-1 mb-8 bg-white dark:bg-gray-800 rounded-lg p-1 shadow-sm">
+                            {navigationItems.map(item => (
+                                <button
+                                    key={item.id}
+                                    onClick={() => setActiveTab(item.id)}
+                                    className={`flex items-center px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                                        activeTab === item.id
+                                            ? 'bg-blue-600 text-white shadow-lg'
+                                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                    }`}
+                                >
+                                    <i className={`fas ${item.icon} mr-2`}></i>
+                                    {item.label}
+                                </button>
+                            ))}
+                        </div>
+                        
+                        {/* Dashboard Tab */}
+                        {activeTab === 'dashboard' && (
+                            <div className="animate-slide-in">
+                                {stats && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                                        <StatsCard
+                                            title="Total Requests"
+                                            value={stats.totalRequests}
+                                            icon="fa-globe"
+                                            color="blue"
+                                        />
+                                        <StatsCard
+                                            title="SQL Queries"
+                                            value={stats.totalSqlQueries}
+                                            icon="fa-database"
+                                            color="green"
+                                        />
+                                        <StatsCard
+                                            title="Log Entries"
+                                            value={stats.totalLogs}
+                                            icon="fa-file-alt"
+                                            color="yellow"
+                                        />
+                                        <StatsCard
+                                            title="Exceptions"
+                                            value={stats.totalExceptions}
+                                            icon="fa-exclamation-triangle"
+                                            color="red"
+                                        />
+                                    </div>
+                                )}
+                                
+                                {/* Performance Overview */}
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    {stats?.slowestRequests?.length > 0 && (
+                                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg">
+                                            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                                    <i className="fas fa-clock mr-2 text-red-500"></i>
+                                                    Slowest Requests
+                                                </h3>
+                                            </div>
+                                            <div className="p-6">
+                                                <div className="space-y-3">
+                                                    {stats.slowestRequests.slice(0, 5).map(request => (
+                                                        <div key={request.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                                            <div className="flex items-center space-x-3">
+                                                                <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getMethodClass(request.method)}`}>
+                                                                    {request.method}
+                                                                </span>
+                                                                <span className="text-sm text-gray-900 dark:text-white truncate">{request.path}</span>
+                                                            </div>
+                                                            <span className="text-sm font-medium text-red-600 dark:text-red-400">{request.executionTimeMs}ms</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    
+                                    {stats?.recentExceptions?.length > 0 && (
+                                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg">
+                                            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                                    <i className="fas fa-exclamation-triangle mr-2 text-red-500"></i>
+                                                    Recent Exceptions
+                                                </h3>
+                                            </div>
+                                            <div className="p-6">
+                                                <div className="space-y-3">
+                                                    {stats.recentExceptions.slice(0, 5).map(exception => (
+                                                        <div key={exception.id} className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border-l-4 border-red-500">
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="text-sm font-medium text-red-800 dark:text-red-300">{exception.exceptionType}</span>
+                                                                <span className="text-xs text-red-600 dark:text-red-400">{formatDate(exception.timestamp)}</span>
+                                                            </div>
+                                                            <p className="text-sm text-red-700 dark:text-red-300 mt-1 truncate">{exception.message}</p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                        
+                        {/* Other tabs content remains similar but with improved styling */}
+                        {activeTab === 'requests' && (
+                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg animate-slide-in">
+                                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                        <i className="fas fa-globe mr-2 text-blue-500"></i>
+                                        HTTP Requests
+                                    </h3>
+                                </div>
+                                {loading ? (
+                                    <LoadingSpinner />
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                            <thead className="bg-gray-50 dark:bg-gray-700">
+                                                <tr>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Method</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Path</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Duration</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Timestamp</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                                {requests.items.map(request => (
+                                                    <tr key={request.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getMethodClass(request.method)}`}>
+                                                                {request.method}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">{request.path}</td>
+                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusClass(request.statusCode)}`}>
+                                                                {request.statusCode}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
+                                                            <span className={request.executionTimeMs > 1000 ? 'text-red-600 dark:text-red-400 font-medium' : ''}>
+                                                                {request.executionTimeMs}ms
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{formatDate(request.timestamp)}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        
+                        {/* Similar improvements for other tabs... */}
+                        {/* SQL Queries Tab */}
+                        {activeTab === 'queries' && (
+                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg animate-slide-in">
+                                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                        <i className="fas fa-database mr-2 text-green-500"></i>
+                                        SQL Queries
+                                    </h3>
+                                </div>
+                                {loading ? (
+                                    <LoadingSpinner />
+                                ) : (
+                                    <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                                        {queries.items.map(query => (
+                                            <div key={query.id} className="p-6 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                                <div className="flex justify-between items-start mb-3">
+                                                    <div className="flex items-center space-x-3">
+                                                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                                                            query.isSuccessful ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                                                        }`}>
+                                                            <i className={`fas ${query.isSuccessful ? 'fa-check' : 'fa-times'} mr-1`}></i>
+                                                            {query.isSuccessful ? 'Success' : 'Error'}
+                                                        </span>
+                                                        <span className={`text-sm font-medium ${
+                                                            query.executionTimeMs > 1000 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'
+                                                        }`}>
+                                                            <i className="fas fa-clock mr-1"></i>
+                                                            {query.executionTimeMs}ms
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-sm text-gray-500 dark:text-gray-400">{formatDate(query.timestamp)}</span>
+                                                </div>
+                                                <div className="code-block">
+                                                    <pre className="text-sm">{query.query}</pre>
+                                                </div>
+                                                {Object.keys(query.parameters).length > 0 && (
+                                                    <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                                        <strong className="text-sm text-gray-700 dark:text-gray-300">
+                                                            <i className="fas fa-cogs mr-1"></i>
+                                                            Parameters:
+                                                        </strong>
+                                                        <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                                                            {Object.entries(query.parameters).map(([key, value]) => (
+                                                                <div key={key} className="ml-2">
+                                                                    <span className="font-medium">{key}:</span> {JSON.stringify(value)}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        
+                        {/* Logs Tab */}
+                        {activeTab === 'logs' && (
+                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg animate-slide-in">
+                                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                        <i className="fas fa-file-alt mr-2 text-yellow-500"></i>
+                                        Log Entries
+                                    </h3>
+                                </div>
+                                {loading ? (
+                                    <LoadingSpinner />
+                                ) : (
+                                    <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                                        {logs.items.map(log => (
+                                            <div key={log.id} className="p-6 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div className="flex items-center space-x-2">
+                                                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getLevelClass(log.level)}`}>
+                                                            {log.level}
+                                                        </span>
+                                                        {log.tag && (
+                                                            <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+                                                                {log.tag}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <span className="text-sm text-gray-500 dark:text-gray-400">{formatDate(log.timestamp)}</span>
+                                                </div>
+                                                <div className="text-sm text-gray-900 dark:text-white">{log.message}</div>
+                                                {Object.keys(log.properties).length > 0 && (
+                                                    <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                                        <strong className="text-sm text-gray-700 dark:text-gray-300">
+                                                            <i className="fas fa-info-circle mr-1"></i>
+                                                            Properties:
+                                                        </strong>
+                                                        <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                                                            {Object.entries(log.properties).map(([key, value]) => (
+                                                                <div key={key} className="ml-2">
+                                                                    <span className="font-medium">{key}:</span> {JSON.stringify(value)}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        
+                        {/* Exceptions Tab */}
+                        {activeTab === 'exceptions' && (
+                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg animate-slide-in">
+                                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                        <i className="fas fa-exclamation-triangle mr-2 text-red-500"></i>
+                                        Exceptions
+                                    </h3>
+                                </div>
+                                {loading ? (
+                                    <LoadingSpinner />
+                                ) : (
+                                    <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                                        {exceptions.items.map(exception => (
+                                            <div key={exception.id} className="p-6 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                                <div className="flex justify-between items-start mb-3">
+                                                    <div className="flex items-center space-x-3">
+                                                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">
+                                                            <i className="fas fa-bug mr-1"></i>
+                                                            {exception.exceptionType}
+                                                        </span>
+                                                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                                                            {exception.method} {exception.path}
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-sm text-gray-500 dark:text-gray-400">{formatDate(exception.timestamp)}</span>
+                                                </div>
+                                                <div className="text-sm text-red-700 dark:text-red-300 mb-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border-l-4 border-red-500">
+                                                    <i className="fas fa-exclamation-circle mr-2"></i>
+                                                    {exception.message}
+                                                </div>
+                                                {exception.stackTrace && (
+                                                    <div className="code-block">
+                                                        <pre className="text-xs">{exception.stackTrace}</pre>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+        
+        ReactDOM.render(<DebugDashboard />, document.getElementById('root'));
+    </script>
+</body>
+</html>

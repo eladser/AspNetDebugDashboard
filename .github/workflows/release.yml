@@ -1,0 +1,96 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '7.0.x'
+    
+    - name: Get version from tag
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+    
+    - name: Restore dependencies
+      run: dotnet restore
+    
+    - name: Build
+      run: dotnet build --configuration Release --no-restore
+    
+    - name: Test
+      run: dotnet test --configuration Release --no-build --verbosity normal
+    
+    - name: Update version in csproj
+      run: |
+        sed -i "s/<Version>.*<\/Version>/<Version>${{ steps.get_version.outputs.VERSION }}<\/Version>/" src/AspNetDebugDashboard/AspNetDebugDashboard.csproj
+        sed -i "s/<AssemblyVersion>.*<\/AssemblyVersion>/<AssemblyVersion>${{ steps.get_version.outputs.VERSION }}<\/AssemblyVersion>/" src/AspNetDebugDashboard/AspNetDebugDashboard.csproj
+        sed -i "s/<FileVersion>.*<\/FileVersion>/<FileVersion>${{ steps.get_version.outputs.VERSION }}<\/FileVersion>/" src/AspNetDebugDashboard/AspNetDebugDashboard.csproj
+    
+    - name: Pack
+      run: dotnet pack src/AspNetDebugDashboard/AspNetDebugDashboard.csproj --configuration Release --no-build --output ./artifacts
+    
+    - name: Publish to NuGet
+      run: dotnet nuget push ./artifacts/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
+    
+    - name: Create GitHub Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ steps.get_version.outputs.VERSION }}
+        body: |
+          ## Changes in this Release
+          
+          ### Features
+          - Updated to version ${{ steps.get_version.outputs.VERSION }}
+          
+          ### Bug Fixes
+          - Various bug fixes and improvements
+          
+          ### Installation
+          ```bash
+          dotnet add package AspNetDebugDashboard --version ${{ steps.get_version.outputs.VERSION }}
+          ```
+          
+          ### Documentation
+          - [Setup Guide](https://github.com/eladser/AspNetDebugDashboard/blob/main/docs/SETUP.md)
+          - [API Documentation](https://github.com/eladser/AspNetDebugDashboard/blob/main/docs/API.md)
+          
+          ### Breaking Changes
+          - None in this release
+          
+          For full changelog, see [CHANGELOG.md](https://github.com/eladser/AspNetDebugDashboard/blob/main/CHANGELOG.md)
+        draft: false
+        prerelease: ${{ contains(steps.get_version.outputs.VERSION, '-') }}
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: nuget-package-${{ steps.get_version.outputs.VERSION }}
+        path: ./artifacts/*.nupkg
+
+  notify:
+    runs-on: ubuntu-latest
+    needs: release
+    if: success()
+    
+    steps:
+    - name: Notify success
+      run: |
+        echo "🎉 Release completed successfully!"
+        echo "📦 Package published to NuGet"
+        echo "📋 GitHub release created"
+        echo "🔗 Available at: https://www.nuget.org/packages/AspNetDebugDashboard/"
