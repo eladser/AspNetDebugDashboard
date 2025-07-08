@@ -1,0 +1,2 @@
+# Icon removed to fix NuGet package publishing issues
+# A proper icon will be added in a future version
