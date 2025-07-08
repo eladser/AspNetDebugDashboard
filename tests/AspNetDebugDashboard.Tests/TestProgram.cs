@@ -4,15 +4,6 @@ namespace AspNetDebugDashboard.Tests;
 
 public class TestProgram
 {
-    public static void Main(string[] args)
-    {
-        CreateHostBuilder(args).Build().Run();
-    }
-
-    public static IHostBuilder CreateHostBuilder(string[] args) =>
-        Host.CreateDefaultBuilder(args)
-            .ConfigureWebHostDefaults(webBuilder =>
-            {
-                webBuilder.UseStartup<TestStartup>();
-            });
+    // This class is used as a marker for WebApplicationFactory<TestProgram>
+    // No Main method needed for integration testing
 }
