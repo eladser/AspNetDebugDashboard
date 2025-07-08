@@ -24,8 +24,12 @@ jobs:
     
     - name: Setup .NET ${{ matrix.dotnet-version }}
       uses: actions/setup-dotnet@v4
+      id: setup-dotnet
       with:
         dotnet-version: ${{ matrix.dotnet-version }}
+        
+    - name: Create temporary global.json
+      run: echo '{"sdk":{"version":"${{ steps.setup-dotnet.outputs.dotnet-version }}","rollForward":"latestFeature"}}' > ./global.json
         
     - name: Cache NuGet packages
       uses: actions/cache@v4
@@ -44,6 +48,9 @@ jobs:
     
     - name: Run tests
       run: dotnet test --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage"
+    
+    - name: Remove temporary global.json
+      run: rm -f ./global.json
 
   package:
     runs-on: ubuntu-latest
@@ -62,6 +69,9 @@ jobs:
           7.0.x
           8.0.x
     
+    - name: Create global.json for multi-targeting
+      run: echo '{"sdk":{"version":"8.0.x","rollForward":"latestFeature"}}' > ./global.json
+    
     - name: Restore dependencies
       run: dotnet restore
     
@@ -70,6 +80,9 @@ jobs:
     
     - name: Pack
       run: dotnet pack src/AspNetDebugDashboard/AspNetDebugDashboard.csproj --configuration Release --no-build --output ./artifacts
+    
+    - name: Remove temporary global.json
+      run: rm -f ./global.json
     
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
@@ -89,6 +102,9 @@ jobs:
       with:
         dotnet-version: '8.0.x'
     
+    - name: Create global.json for sample app
+      run: echo '{"sdk":{"version":"8.0.x","rollForward":"latestFeature"}}' > ./global.json
+    
     - name: Restore dependencies
       run: dotnet restore
     
@@ -101,3 +117,6 @@ jobs:
         dotnet pack src/AspNetDebugDashboard/AspNetDebugDashboard.csproj --configuration Release --output ./test-packages
         ls -la ./test-packages/
         echo "✅ Package created successfully"
+    
+    - name: Remove temporary global.json
+      run: rm -f ./global.json
