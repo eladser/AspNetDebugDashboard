@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net8.0;net9.0</TargetFrameworks>
+    <TargetFrameworks>net7.0;net8.0</TargetFrameworks>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
@@ -42,7 +42,7 @@
       - Zero-configuration setup with extensive customization
       
       🔧 Technical:
-      - Multi-framework support (.NET 8.0 and 9.0)
+      - Multi-framework support (.NET 7.0 and 8.0)
       - LiteDB storage for lightweight operation
       - Comprehensive test coverage
       - Production-ready with minimal performance impact
@@ -78,18 +78,18 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     
     <!-- Entity Framework packages -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="7.0.20" Condition="'$(TargetFramework)' == 'net7.0'" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.11" Condition="'$(TargetFramework)' == 'net8.0'" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" Condition="'$(TargetFramework)' == 'net9.0'" />
     
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="7.0.20" Condition="'$(TargetFramework)' == 'net7.0'" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="8.0.11" Condition="'$(TargetFramework)' == 'net8.0'" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.0" Condition="'$(TargetFramework)' == 'net9.0'" />
     
     <!-- Storage -->
     <PackageReference Include="LiteDB" Version="5.0.21" />
     
-    <!-- JSON serialization (updated to secure versions) -->
+    <!-- JSON serialization -->
+    <PackageReference Include="System.Text.Json" Version="7.0.4" Condition="'$(TargetFramework)' == 'net7.0'" />
     <PackageReference Include="System.Text.Json" Version="8.0.5" Condition="'$(TargetFramework)' == 'net8.0'" />
-    <PackageReference Include="System.Text.Json" Version="9.0.0" Condition="'$(TargetFramework)' == 'net9.0'" />
   </ItemGroup>
 
   <ItemGroup>
@@ -106,12 +106,12 @@
   </ItemGroup>
 
   <!-- Define framework-specific constants -->
-  <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
-    <DefineConstants>$(DefineConstants);NET8_0</DefineConstants>
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net7.0'">
+    <DefineConstants>$(DefineConstants);NET7_0</DefineConstants>
   </PropertyGroup>
   
-  <PropertyGroup Condition="'$(TargetFramework)' == 'net9.0'">
-    <DefineConstants>$(DefineConstants);NET9_0</DefineConstants>
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <DefineConstants>$(DefineConstants);NET8_0</DefineConstants>
   </PropertyGroup>
 
 </Project>
