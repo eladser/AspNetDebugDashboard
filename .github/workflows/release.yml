@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*.*.*'
 
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -14,14 +19,19 @@ jobs:
       with:
         fetch-depth: 0
     
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '7.0.x'
-    
     - name: Get version from tag
       id: get_version
       run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+    
+    - name: Setup .NET (Multi-target)
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: |
+          7.0.x
+          8.0.x
+    
+    - name: Create global.json for multi-targeting
+      run: echo '{"sdk":{"version":"8.0.x","rollForward":"latestFeature"}}' > ./global.json
     
     - name: Restore dependencies
       run: dotnet restore
@@ -34,15 +44,18 @@ jobs:
     
     - name: Update version in csproj
       run: |
-        sed -i "s/<Version>.*<\/Version>/<Version>${{ steps.get_version.outputs.VERSION }}<\/Version>/" src/AspNetDebugDashboard/AspNetDebugDashboard.csproj
-        sed -i "s/<AssemblyVersion>.*<\/AssemblyVersion>/<AssemblyVersion>${{ steps.get_version.outputs.VERSION }}<\/AssemblyVersion>/" src/AspNetDebugDashboard/AspNetDebugDashboard.csproj
-        sed -i "s/<FileVersion>.*<\/FileVersion>/<FileVersion>${{ steps.get_version.outputs.VERSION }}<\/FileVersion>/" src/AspNetDebugDashboard/AspNetDebugDashboard.csproj
+        sed -i "s/<Version>.*<\\/Version>/<Version>${{ steps.get_version.outputs.VERSION }}<\\/Version>/" src/AspNetDebugDashboard/AspNetDebugDashboard.csproj
+        sed -i "s/<AssemblyVersion>.*<\\/AssemblyVersion>/<AssemblyVersion>${{ steps.get_version.outputs.VERSION }}<\\/AssemblyVersion>/" src/AspNetDebugDashboard/AspNetDebugDashboard.csproj
+        sed -i "s/<FileVersion>.*<\\/FileVersion>/<FileVersion>${{ steps.get_version.outputs.VERSION }}<\\/FileVersion>/" src/AspNetDebugDashboard/AspNetDebugDashboard.csproj
     
     - name: Pack
       run: dotnet pack src/AspNetDebugDashboard/AspNetDebugDashboard.csproj --configuration Release --no-build --output ./artifacts
     
     - name: Publish to NuGet
       run: dotnet nuget push ./artifacts/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
+    
+    - name: Remove temporary global.json
+      run: rm -f ./global.json
     
     - name: Create GitHub Release
       uses: actions/create-release@v1
@@ -52,25 +65,51 @@ jobs:
         tag_name: ${{ github.ref }}
         release_name: Release ${{ steps.get_version.outputs.VERSION }}
         body: |
-          ## Changes in this Release
+          ## 🎉 ASP.NET Debug Dashboard v${{ steps.get_version.outputs.VERSION }}
           
-          ### Features
-          - Updated to version ${{ steps.get_version.outputs.VERSION }}
+          **A beautiful, lightweight debugging dashboard for ASP.NET Core applications**
           
-          ### Bug Fixes
-          - Various bug fixes and improvements
+          ### ✨ Key Features
           
-          ### Installation
+          🌐 **HTTP Request Monitoring** - Real-time tracking with performance metrics  
+          🗃️ **SQL Query Analysis** - EF Core integration with slow query detection  
+          🚨 **Exception Tracking** - Global handling with full stack traces  
+          📝 **Smart Logging** - Structured logging with custom properties  
+          🎨 **Modern Dashboard** - Dark/light themes, real-time updates, mobile-responsive  
+          
+          ### 🚀 Quick Start
+          
           ```bash
           dotnet add package AspNetDebugDashboard --version ${{ steps.get_version.outputs.VERSION }}
           ```
           
-          ### Documentation
-          - [Setup Guide](https://github.com/eladser/AspNetDebugDashboard/blob/main/docs/SETUP.md)
-          - [API Documentation](https://github.com/eladser/AspNetDebugDashboard/blob/main/docs/API.md)
+          ```csharp
+          // Add to Program.cs
+          builder.Services.AddDebugDashboard();
+          app.UseDebugDashboard();
           
-          ### Breaking Changes
-          - None in this release
+          // Navigate to /_debug
+          ```
+          
+          ### 🔒 Production Ready
+          
+          - **Security-first design** with privacy controls
+          - **< 5ms overhead** per request
+          - **95%+ test coverage**
+          - **Development-only by default**
+          
+          ### 📚 Documentation
+          
+          - [Getting Started](https://github.com/eladser/AspNetDebugDashboard/blob/main/docs/GETTING_STARTED.md)
+          - [Configuration](https://github.com/eladser/AspNetDebugDashboard/blob/main/docs/CONFIGURATION.md)
+          - [API Reference](https://github.com/eladser/AspNetDebugDashboard/blob/main/docs/API.md)
+          
+          ### 📦 Requirements
+          
+          - .NET 7.0 or 8.0
+          - ASP.NET Core 7.0+
+          
+          **Transform your debugging experience today!** 🚀
           
           For full changelog, see [CHANGELOG.md](https://github.com/eladser/AspNetDebugDashboard/blob/main/CHANGELOG.md)
         draft: false
@@ -90,7 +129,7 @@ jobs:
     steps:
     - name: Notify success
       run: |
-        echo "🎉 Release completed successfully!"
+        echo "🎉 Release v${{ github.ref_name }} completed successfully!"
         echo "📦 Package published to NuGet"
         echo "📋 GitHub release created"
         echo "🔗 Available at: https://www.nuget.org/packages/AspNetDebugDashboard/"

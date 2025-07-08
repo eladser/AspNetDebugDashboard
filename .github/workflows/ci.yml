@@ -17,15 +17,25 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        dotnet-version: ['8.0.x']
+        framework: ['net7.0', 'net8.0']
 
     steps:
     - uses: actions/checkout@v4
     
-    - name: Setup .NET ${{ matrix.dotnet-version }}
+    # Install all required .NET SDKs (order doesn't matter - highest will be used)
+    - name: Setup .NET 7.0
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: ${{ matrix.dotnet-version }}
+        dotnet-version: '7.0.x'
+        
+    - name: Setup .NET 8.0
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+    
+    # Clean all obj/bin folders to avoid corrupted project.assets.json
+    - name: Clean solution
+      run: dotnet clean
         
     - name: Cache NuGet packages
       uses: actions/cache@v4
@@ -35,14 +45,15 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-nuget-
     
+    # Force fresh restore with all dependencies
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore --force --no-cache
     
-    - name: Build solution
-      run: dotnet build --no-restore --configuration Release
+    - name: Build for ${{ matrix.framework }}
+      run: dotnet build --no-restore --configuration Release --framework ${{ matrix.framework }}
     
-    - name: Run tests
-      run: dotnet test --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage"
+    - name: Test for ${{ matrix.framework }}
+      run: dotnet test --no-build --configuration Release --framework ${{ matrix.framework }} --verbosity normal --collect:"XPlat Code Coverage"
 
   package:
     runs-on: ubuntu-latest
@@ -54,13 +65,22 @@ jobs:
       with:
         fetch-depth: 0
     
-    - name: Setup .NET
+    # Install all required .NET SDKs
+    - name: Setup .NET 7.0
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '7.0.x'
+        
+    - name: Setup .NET 8.0
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '8.0.x'
     
+    - name: Clean solution
+      run: dotnet clean
+    
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore --force --no-cache
     
     - name: Build
       run: dotnet build --no-restore --configuration Release
@@ -81,13 +101,22 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Setup .NET
+    # Install all required .NET SDKs
+    - name: Setup .NET 7.0
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '7.0.x'
+        
+    - name: Setup .NET 8.0
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '8.0.x'
     
+    - name: Clean solution
+      run: dotnet clean
+    
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore --force --no-cache
     
     - name: Build sample app
       run: dotnet build samples/SampleApp/SampleApp.csproj --configuration Release
