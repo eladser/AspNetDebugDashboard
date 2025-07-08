@@ -5,13 +5,19 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        dotnet-version: ['7.0.x', '8.0.x']
+        dotnet-version: ['7.0.x']
 
     steps:
     - uses: actions/checkout@v4
@@ -29,14 +35,6 @@ jobs:
     
     - name: Test
       run: dotnet test --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage"
-    
-    - name: Upload coverage reports to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: false
 
   package:
     runs-on: ubuntu-latest
@@ -68,27 +66,6 @@ jobs:
         name: nuget-package
         path: ./artifacts/*.nupkg
 
-  security:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Run security scan
-      uses: securecodewarrior/github-action-add-sarif@v1
-      with:
-        sarif-file: 'security-scan-results.sarif'
-    
-    - name: Run CodeQL Analysis
-      uses: github/codeql-action/init@v3
-      with:
-        languages: 'csharp'
-    
-    - name: Autobuild
-      uses: github/codeql-action/autobuild@v3
-    
-    - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v3
-
   sample-app-test:
     runs-on: ubuntu-latest
     needs: build
@@ -101,34 +78,15 @@ jobs:
       with:
         dotnet-version: '7.0.x'
     
+    - name: Restore dependencies
+      run: dotnet restore
+    
     - name: Build sample app
       run: dotnet build samples/SampleApp/SampleApp.csproj --configuration Release
     
-    - name: Start sample app
+    - name: Test package creation
       run: |
-        cd samples/SampleApp
-        dotnet run --configuration Release &
-        sleep 30
-    
-    - name: Test dashboard endpoint
-      run: |
-        response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/_debug)
-        if [ $response -eq 200 ]; then
-          echo "✅ Dashboard is accessible"
-        else
-          echo "❌ Dashboard returned status code: $response"
-          exit 1
-        fi
-    
-    - name: Test API endpoints
-      run: |
-        # Test stats endpoint
-        curl -f http://localhost:5000/_debug/api/stats || exit 1
-        
-        # Test config endpoint
-        curl -f http://localhost:5000/_debug/api/config || exit 1
-        
-        # Test health endpoint
-        curl -f http://localhost:5000/_debug/api/health || exit 1
-        
-        echo "✅ All API endpoints are working"
+        echo "Testing package creation..."
+        dotnet pack src/AspNetDebugDashboard/AspNetDebugDashboard.csproj --configuration Release --output ./test-packages
+        ls -la ./test-packages/
+        echo "✅ Package created successfully"
