@@ -32,6 +32,10 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '8.0.x'
+    
+    # Clean all obj/bin folders to avoid corrupted project.assets.json
+    - name: Clean solution
+      run: dotnet clean
         
     - name: Cache NuGet packages
       uses: actions/cache@v4
@@ -41,8 +45,9 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-nuget-
     
+    # Force fresh restore with all dependencies
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore --force --no-cache
     
     - name: Build for ${{ matrix.framework }}
       run: dotnet build --no-restore --configuration Release --framework ${{ matrix.framework }}
@@ -71,8 +76,11 @@ jobs:
       with:
         dotnet-version: '8.0.x'
     
+    - name: Clean solution
+      run: dotnet clean
+    
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore --force --no-cache
     
     - name: Build
       run: dotnet build --no-restore --configuration Release
@@ -104,8 +112,11 @@ jobs:
       with:
         dotnet-version: '8.0.x'
     
+    - name: Clean solution
+      run: dotnet clean
+    
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore --force --no-cache
     
     - name: Build sample app
       run: dotnet build samples/SampleApp/SampleApp.csproj --configuration Release
