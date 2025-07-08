@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net7.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
@@ -42,7 +42,7 @@
       - Zero-configuration setup with extensive customization
       
       🔧 Technical:
-      - .NET 7.0 support for broad compatibility
+      - .NET 8.0 support for modern features and performance
       - LiteDB storage for lightweight operation
       - Comprehensive test coverage
       - Production-ready with minimal performance impact
@@ -78,14 +78,14 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     
     <!-- Entity Framework packages -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="7.0.20" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="7.0.20" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="8.0.11" />
     
     <!-- Storage -->
     <PackageReference Include="LiteDB" Version="5.0.21" />
     
     <!-- JSON serialization -->
-    <PackageReference Include="System.Text.Json" Version="7.0.4" />
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
   </ItemGroup>
 
   <ItemGroup>
