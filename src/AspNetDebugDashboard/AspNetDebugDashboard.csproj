@@ -22,7 +22,6 @@
     <RepositoryUrl>https://github.com/eladser/AspNetDebugDashboard</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <RepositoryBranch>main</RepositoryBranch>
-    <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>
       Version 1.0.0 - Production-ready release with comprehensive features:
       
@@ -90,7 +89,6 @@
 
   <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
-    <None Include="icon.png" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <ItemGroup>
