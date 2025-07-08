@@ -30,6 +30,9 @@ jobs:
           7.0.x
           8.0.x
     
+    - name: Create global.json for multi-targeting
+      run: echo '{"sdk":{"version":"8.0.x","rollForward":"latestFeature"}}' > ./global.json
+    
     - name: Restore dependencies
       run: dotnet restore
     
@@ -50,6 +53,9 @@ jobs:
     
     - name: Publish to NuGet
       run: dotnet nuget push ./artifacts/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
+    
+    - name: Remove temporary global.json
+      run: rm -f ./global.json
     
     - name: Create GitHub Release
       uses: actions/create-release@v1
