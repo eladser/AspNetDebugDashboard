@@ -1,1 +1,183 @@
-name: Publish to NuGet\n\non:\n  release:\n    types: [published]\n\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    environment: production\n    \n    steps:\n    - name: Checkout code\n      uses: actions/checkout@v4\n    \n    - name: Setup .NET\n      uses: actions/setup-dotnet@v4\n      with:\n        dotnet-version: '7.0.x'\n        \n    - name: Cache NuGet packages\n      uses: actions/cache@v4\n      with:\n        path: ~/.nuget/packages\n        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}\n        restore-keys: |\n          ${{ runner.os }}-nuget-\n        \n    - name: Restore dependencies\n      run: dotnet restore\n      \n    - name: Build solution\n      run: dotnet build --no-restore --configuration Release\n      \n    - name: Run tests\n      run: dotnet test --no-build --configuration Release --verbosity normal\n      \n    - name: Build sample application\n      run: |\n        cd samples/SampleApp\n        dotnet build --configuration Release\n      \n    - name: Pack NuGet package\n      run: dotnet pack src/AspNetDebugDashboard/AspNetDebugDashboard.csproj --no-build --configuration Release --output ./artifacts --include-symbols --include-source\n      \n    - name: Verify package contents\n      run: |\n        echo \"Package contents:\"\n        ls -la ./artifacts/\n        \n    - name: Publish to NuGet\n      run: |\n        dotnet nuget push ./artifacts/*.nupkg \\\n          --api-key ${{ secrets.NUGET_API_KEY }} \\\n          --source https://api.nuget.org/v3/index.json \\\n          --skip-duplicate \\\n          --no-symbols\n          \n    - name: Publish symbols to NuGet\n      run: |\n        if ls ./artifacts/*.snupkg 1> /dev/null 2>&1; then\n          dotnet nuget push ./artifacts/*.snupkg \\\n            --api-key ${{ secrets.NUGET_API_KEY }} \\\n            --source https://api.nuget.org/v3/index.json \\\n            --skip-duplicate\n        else\n          echo \"No symbol packages found\"\n        fi\n      \n    - name: Create release summary\n      run: |\n        echo \"## 🚀 NuGet Package Published\" >> $GITHUB_STEP_SUMMARY\n        echo \"\" >> $GITHUB_STEP_SUMMARY\n        echo \"Package: AspNetDebugDashboard\" >> $GITHUB_STEP_SUMMARY\n        echo \"Version: ${{ github.ref_name }}\" >> $GITHUB_STEP_SUMMARY\n        echo \"\" >> $GITHUB_STEP_SUMMARY\n        echo \"### Installation\" >> $GITHUB_STEP_SUMMARY\n        echo \"\\`\\`\\`bash\" >> $GITHUB_STEP_SUMMARY\n        echo \"dotnet add package AspNetDebugDashboard --version ${{ github.ref_name }}\" >> $GITHUB_STEP_SUMMARY\n        echo \"\\`\\`\\`\" >> $GITHUB_STEP_SUMMARY\n        echo \"\" >> $GITHUB_STEP_SUMMARY\n        echo \"### Package URL\" >> $GITHUB_STEP_SUMMARY\n        echo \"https://www.nuget.org/packages/AspNetDebugDashboard/\" >> $GITHUB_STEP_SUMMARY\n"
+name: Publish to NuGet
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., 1.0.0)'
+        required: true
+        type: string
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+        
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+          
+    - name: Determine version
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" == "release" ]; then
+          VERSION="${{ github.event.release.tag_name }}"
+        else
+          VERSION="${{ github.event.inputs.version }}"
+        fi
+        
+        # Remove 'v' prefix if present
+        VERSION=${VERSION#v}
+        
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "Package version: $VERSION"
+        
+    - name: Restore dependencies
+      run: dotnet restore
+      
+    - name: Build solution
+      run: dotnet build --no-restore --configuration Release
+      
+    - name: Run tests
+      run: dotnet test --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage
+      
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results
+        path: ./coverage
+        
+    - name: Build sample application
+      run: |
+        if [ -d "samples/SampleApp" ]; then
+          cd samples/SampleApp
+          dotnet build --configuration Release
+        else
+          echo "Sample application not found, skipping..."
+        fi
+      
+    - name: Pack NuGet package
+      run: |
+        dotnet pack src/AspNetDebugDashboard/AspNetDebugDashboard.csproj \
+          --no-build \
+          --configuration Release \
+          --output ./artifacts \
+          --include-symbols \
+          --include-source \
+          -p:PackageVersion=${{ steps.version.outputs.VERSION }} \
+          -p:AssemblyVersion=${{ steps.version.outputs.VERSION }} \
+          -p:FileVersion=${{ steps.version.outputs.VERSION }} \
+          -p:InformationalVersion=${{ steps.version.outputs.VERSION }}
+      
+    - name: Verify package contents
+      run: |
+        echo "📦 Package contents:"
+        ls -la ./artifacts/
+        echo ""
+        echo "📋 Package details:"
+        for pkg in ./artifacts/*.nupkg; do
+          echo "Package: $(basename $pkg)"
+          dotnet nuget verify $pkg || true
+        done
+        
+    - name: Test package installation
+      run: |
+        # Create a temporary test project to verify the package
+        mkdir -p ./test-install
+        cd ./test-install
+        dotnet new web -n TestApp
+        cd TestApp
+        
+        echo "Testing package installation..."
+        dotnet add package AspNetDebugDashboard --source ../../artifacts --prerelease
+        dotnet build
+        
+    - name: Publish to NuGet
+      run: |
+        echo "🚀 Publishing package to NuGet..."
+        dotnet nuget push ./artifacts/*.nupkg \
+          --api-key ${{ secrets.NUGET_API_KEY }} \
+          --source https://api.nuget.org/v3/index.json \
+          --skip-duplicate \
+          --no-symbols
+          
+    - name: Publish symbols to NuGet
+      run: |
+        if ls ./artifacts/*.snupkg 1> /dev/null 2>&1; then
+          echo "📊 Publishing symbol packages..."
+          dotnet nuget push ./artifacts/*.snupkg \
+            --api-key ${{ secrets.NUGET_API_KEY }} \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
+        else
+          echo "ℹ️ No symbol packages found"
+        fi
+      
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: nuget-packages
+        path: ./artifacts/
+        retention-days: 30
+        
+    - name: Create deployment summary
+      run: |
+        echo "## 🚀 NuGet Package Published Successfully" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📦 Package Information" >> $GITHUB_STEP_SUMMARY
+        echo "- **Package**: AspNetDebugDashboard" >> $GITHUB_STEP_SUMMARY
+        echo "- **Version**: ${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Published**: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📥 Installation" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+        echo "dotnet add package AspNetDebugDashboard --version ${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔗 Links" >> $GITHUB_STEP_SUMMARY
+        echo "- [NuGet Package](https://www.nuget.org/packages/AspNetDebugDashboard/)" >> $GITHUB_STEP_SUMMARY
+        echo "- [GitHub Release](${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ github.ref_name }})" >> $GITHUB_STEP_SUMMARY
+        echo "- [Documentation](https://github.com/${{ github.repository }}#readme)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### ✅ Package Files Published" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        ls -la ./artifacts/ >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        
+    - name: Notify success
+      if: success()
+      run: |
+        echo "🎉 Package AspNetDebugDashboard v${{ steps.version.outputs.VERSION }} has been successfully published to NuGet!"
+        echo "📦 View package: https://www.nuget.org/packages/AspNetDebugDashboard/"
+        
+    - name: Notify failure
+      if: failure()
+      run: |
+        echo "❌ Failed to publish package to NuGet. Please check the logs for details."
+        echo "💡 Common issues:"
+        echo "   - Invalid API key"
+        echo "   - Version already exists"
+        echo "   - Package validation errors"
