@@ -17,7 +17,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        dotnet-version: ['7.0.x', '8.0.x']
+        include:
+          - dotnet-version: '7.0.x'
+            target-framework: 'net7.0'
+          - dotnet-version: '8.0.x'
+            target-framework: 'net8.0'
 
     steps:
     - uses: actions/checkout@v4
@@ -43,11 +47,11 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
     
-    - name: Build solution
-      run: dotnet build --no-restore --configuration Release
+    - name: Build solution for specific framework
+      run: dotnet build --no-restore --configuration Release --framework ${{ matrix.target-framework }}
     
-    - name: Run tests
-      run: dotnet test --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage"
+    - name: Run tests for specific framework
+      run: dotnet test --no-build --configuration Release --framework ${{ matrix.target-framework }} --verbosity normal --collect:"XPlat Code Coverage"
     
     - name: Remove temporary global.json
       run: rm -f ./global.json
