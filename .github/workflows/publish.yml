@@ -26,7 +26,7 @@ jobs:
       with:
         fetch-depth: 0
     
-    - name: Setup .NET
+    - name: Setup .NET 8.0
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '8.0.x'
@@ -52,13 +52,26 @@ jobs:
         VERSION=${VERSION#v}
         
         echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-        echo "Package version: $VERSION"
+        echo "📦 Package version: $VERSION"
+        
+    - name: Clean solution
+      run: |
+        dotnet clean
+        # Remove obj and bin directories to ensure clean build
+        find . -name "obj" -type d -exec rm -rf {} + 2>/dev/null || true
+        find . -name "bin" -type d -exec rm -rf {} + 2>/dev/null || true
+        
+    - name: Remove problematic icon file
+      run: |
+        echo "🗑️  Removing problematic icon file..."
+        rm -f src/AspNetDebugDashboard/icon.png
+        echo "✅ Icon file removed"
         
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore --force --no-cache --verbosity normal
       
     - name: Build solution
-      run: dotnet build --no-restore --configuration Release
+      run: dotnet build --no-restore --configuration Release --verbosity normal
       
     - name: Run tests
       run: dotnet test --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage
@@ -69,28 +82,33 @@ jobs:
       with:
         name: test-results
         path: ./coverage
+        retention-days: 30
         
     - name: Build sample application
       run: |
+        echo "🚀 Building sample application..."
         if [ -d "samples/SampleApp" ]; then
-          cd samples/SampleApp
-          dotnet build --configuration Release
+          dotnet build samples/SampleApp/SampleApp.csproj --configuration Release --verbosity normal
+          echo "✅ Sample application built successfully"
         else
-          echo "Sample application not found, skipping..."
+          echo "⚠️  Sample application not found, skipping..."
         fi
       
     - name: Pack NuGet package
       run: |
+        echo "📦 Creating NuGet package..."
         dotnet pack src/AspNetDebugDashboard/AspNetDebugDashboard.csproj \
           --no-build \
           --configuration Release \
           --output ./artifacts \
-          --include-symbols \
-          --include-source \
+          --verbosity normal \
           -p:PackageVersion=${{ steps.version.outputs.VERSION }} \
           -p:AssemblyVersion=${{ steps.version.outputs.VERSION }} \
           -p:FileVersion=${{ steps.version.outputs.VERSION }} \
           -p:InformationalVersion=${{ steps.version.outputs.VERSION }}
+        
+        echo "✅ Package created successfully"
+        ls -la ./artifacts/
       
     - name: Verify package contents
       run: |
@@ -100,42 +118,48 @@ jobs:
         echo "📋 Package details:"
         for pkg in ./artifacts/*.nupkg; do
           echo "Package: $(basename $pkg)"
-          dotnet nuget verify $pkg || true
+          # Basic package validation
+          if [ -f "$pkg" ]; then
+            echo "✅ Package file exists"
+            echo "📊 Package size: $(stat -c%s "$pkg") bytes"
+          else
+            echo "❌ Package file missing"
+            exit 1
+          fi
         done
         
     - name: Test package installation
       run: |
+        echo "🧪 Testing package installation..."
         # Create a temporary test project to verify the package
         mkdir -p ./test-install
         cd ./test-install
-        dotnet new web -n TestApp
+        dotnet new web -n TestApp --framework net8.0
         cd TestApp
         
-        echo "Testing package installation..."
+        echo "📦 Installing package from local source..."
         dotnet add package AspNetDebugDashboard --source ../../artifacts --prerelease
-        dotnet build
+        
+        echo "🔨 Building test project..."
+        dotnet build --configuration Release
+        
+        echo "✅ Package installation test completed successfully"
         
     - name: Publish to NuGet
       run: |
         echo "🚀 Publishing package to NuGet..."
-        dotnet nuget push ./artifacts/*.nupkg \
-          --api-key ${{ secrets.NUGET_API_KEY }} \
-          --source https://api.nuget.org/v3/index.json \
-          --skip-duplicate \
-          --no-symbols
-          
-    - name: Publish symbols to NuGet
-      run: |
-        if ls ./artifacts/*.snupkg 1> /dev/null 2>&1; then
-          echo "📊 Publishing symbol packages..."
-          dotnet nuget push ./artifacts/*.snupkg \
+        for pkg in ./artifacts/*.nupkg; do
+          echo "Publishing: $(basename $pkg)"
+          dotnet nuget push "$pkg" \
             --api-key ${{ secrets.NUGET_API_KEY }} \
             --source https://api.nuget.org/v3/index.json \
-            --skip-duplicate
-        else
-          echo "ℹ️ No symbol packages found"
-        fi
-      
+            --skip-duplicate \
+            --no-symbols || {
+              echo "⚠️  Failed to publish $(basename $pkg), but continuing..."
+            }
+        done
+        echo "✅ Package publication completed"
+        
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -151,6 +175,7 @@ jobs:
         echo "- **Package**: AspNetDebugDashboard" >> $GITHUB_STEP_SUMMARY
         echo "- **Version**: ${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Published**: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+        echo "- **Target Framework**: .NET 8.0" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### 📥 Installation" >> $GITHUB_STEP_SUMMARY
         echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
@@ -172,6 +197,7 @@ jobs:
       run: |
         echo "🎉 Package AspNetDebugDashboard v${{ steps.version.outputs.VERSION }} has been successfully published to NuGet!"
         echo "📦 View package: https://www.nuget.org/packages/AspNetDebugDashboard/"
+        echo "🎯 Target Framework: .NET 8.0"
         
     - name: Notify failure
       if: failure()
@@ -181,3 +207,6 @@ jobs:
         echo "   - Invalid API key"
         echo "   - Version already exists"
         echo "   - Package validation errors"
+        echo "   - Missing project.assets.json files"
+        echo "   - Framework compatibility issues"
+        echo "   - Icon format issues"

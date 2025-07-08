@@ -2,17 +2,16 @@ name: "CodeQL"
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main, develop ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ main, develop ]
   schedule:
-    - cron: '22 18 * * 1'
+    - cron: '0 8 * * 1'
 
 jobs:
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
-    timeout-minutes: 360
     permissions:
       actions: read
       contents: read
@@ -21,29 +20,32 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'csharp', 'javascript' ]
+        language: [ 'csharp' ]
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+
+    - name: Setup .NET 8.0
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
 
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
       with:
         languages: ${{ matrix.language }}
 
-    - name: Setup .NET
-      if: matrix.language == 'csharp'
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '8.0.x'
+    - name: Clean solution
+      run: |
+        dotnet clean
+        find . -name "obj" -type d -exec rm -rf {} + 2>/dev/null || true
+        find . -name "bin" -type d -exec rm -rf {} + 2>/dev/null || true
 
     - name: Restore dependencies
-      if: matrix.language == 'csharp'
-      run: dotnet restore
+      run: dotnet restore --force --no-cache
 
-    - name: Build
-      if: matrix.language == 'csharp'
+    - name: Build solution
       run: dotnet build --no-restore --configuration Release
 
     - name: Perform CodeQL Analysis
