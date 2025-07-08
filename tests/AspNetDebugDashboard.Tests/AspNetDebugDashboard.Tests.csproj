@@ -33,7 +33,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\AspNetDebugDashboard\AspNetDebugDashboard.csproj" />
-    <ProjectReference Include="..\..\samples\SampleApp\SampleApp.csproj" />
   </ItemGroup>
 
 </Project>
