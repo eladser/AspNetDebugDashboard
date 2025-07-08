@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        dotnet-version: ['8.0.x']
+        dotnet-version: ['7.0.x', '8.0.x']
 
     steps:
     - uses: actions/checkout@v4
@@ -31,8 +31,9 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}-${{ matrix.dotnet-version }}
         restore-keys: |
+          ${{ runner.os }}-nuget-${{ matrix.dotnet-version }}-
           ${{ runner.os }}-nuget-
     
     - name: Restore dependencies
@@ -54,10 +55,12 @@ jobs:
       with:
         fetch-depth: 0
     
-    - name: Setup .NET
+    - name: Setup .NET (Multi-target)
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '8.0.x'
+        dotnet-version: |
+          7.0.x
+          8.0.x
     
     - name: Restore dependencies
       run: dotnet restore
