@@ -236,17 +236,38 @@ public class DebugDashboardIntegrationTests : IClassFixture<TestWebApplicationFa
     }
 }
 
-// Simplified test factory using the Program class
+// Test factory with proper content root configuration
 public class TestWebApplicationFactory : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
         
+        // Set the content root to the current directory to fix path issues
+        builder.UseContentRoot(Directory.GetCurrentDirectory());
+        
         // Override configurations for testing if needed
         builder.ConfigureServices(services =>
         {
-            // Additional test-specific service configurations can go here
+            // Override specific configurations for testing
+            services.Configure<HealthCheckServiceOptions>(options =>
+            {
+                options.Registrations.Clear();
+            });
+            
+            // Override Debug Dashboard configuration for testing
+            services.AddDebugDashboard(options =>
+            {
+                options.DatabasePath = $":memory:{Guid.NewGuid()}";
+                options.IsEnabled = true;
+                options.LogRequestBodies = true;
+                options.LogResponseBodies = true;
+                options.LogSqlQueries = true;
+                options.LogExceptions = true;
+                options.EnablePerformanceCounters = true;
+                options.AllowDataExport = true;
+                options.MaxEntries = 1000;
+            });
         });
     }
 }
