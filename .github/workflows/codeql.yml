@@ -36,7 +36,9 @@ jobs:
       if: matrix.language == 'csharp'
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '7.0.x'
+        dotnet-version: |
+          7.0.x
+          8.0.x
 
     - name: Restore dependencies
       if: matrix.language == 'csharp'
