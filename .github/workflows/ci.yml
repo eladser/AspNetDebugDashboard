@@ -17,44 +17,38 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        include:
-          - dotnet-version: '7.0.x'
-            target-framework: 'net7.0'
-          - dotnet-version: '8.0.x'
-            target-framework: 'net8.0'
+        framework: ['net7.0', 'net8.0']
 
     steps:
     - uses: actions/checkout@v4
     
-    - name: Setup .NET ${{ matrix.dotnet-version }}
+    # Install all required .NET SDKs (order doesn't matter - highest will be used)
+    - name: Setup .NET 7.0
       uses: actions/setup-dotnet@v4
-      id: setup-dotnet
       with:
-        dotnet-version: ${{ matrix.dotnet-version }}
+        dotnet-version: '7.0.x'
         
-    - name: Create temporary global.json for matrix version
-      run: echo '{"sdk":{"version":"${{ steps.setup-dotnet.outputs.dotnet-version }}","rollForward":"latestFeature"}}' > ./global.json
+    - name: Setup .NET 8.0
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
         
     - name: Cache NuGet packages
       uses: actions/cache@v4
       with:
         path: ~/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}-${{ matrix.dotnet-version }}
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
         restore-keys: |
-          ${{ runner.os }}-nuget-${{ matrix.dotnet-version }}-
           ${{ runner.os }}-nuget-
     
     - name: Restore dependencies
       run: dotnet restore
     
-    - name: Build solution for specific framework
-      run: dotnet build --no-restore --configuration Release --framework ${{ matrix.target-framework }}
+    - name: Build for ${{ matrix.framework }}
+      run: dotnet build --no-restore --configuration Release --framework ${{ matrix.framework }}
     
-    - name: Run tests for specific framework
-      run: dotnet test --no-build --configuration Release --framework ${{ matrix.target-framework }} --verbosity normal --collect:"XPlat Code Coverage"
-    
-    - name: Remove temporary global.json
-      run: rm -f ./global.json
+    - name: Test for ${{ matrix.framework }}
+      run: dotnet test --no-build --configuration Release --framework ${{ matrix.framework }} --verbosity normal --collect:"XPlat Code Coverage"
 
   package:
     runs-on: ubuntu-latest
@@ -66,15 +60,16 @@ jobs:
       with:
         fetch-depth: 0
     
-    - name: Setup .NET (Multi-target)
+    # Install all required .NET SDKs
+    - name: Setup .NET 7.0
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: |
-          7.0.x
-          8.0.x
-    
-    - name: Create global.json for multi-targeting (use latest)
-      run: echo '{"sdk":{"version":"8.0.x","rollForward":"latestFeature"}}' > ./global.json
+        dotnet-version: '7.0.x'
+        
+    - name: Setup .NET 8.0
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
     
     - name: Restore dependencies
       run: dotnet restore
@@ -84,9 +79,6 @@ jobs:
     
     - name: Pack
       run: dotnet pack src/AspNetDebugDashboard/AspNetDebugDashboard.csproj --configuration Release --no-build --output ./artifacts
-    
-    - name: Remove temporary global.json
-      run: rm -f ./global.json
     
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
@@ -101,13 +93,16 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Setup .NET
+    # Install all required .NET SDKs
+    - name: Setup .NET 7.0
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '7.0.x'
+        
+    - name: Setup .NET 8.0
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '8.0.x'
-    
-    - name: Create global.json for sample app
-      run: echo '{"sdk":{"version":"8.0.x","rollForward":"latestFeature"}}' > ./global.json
     
     - name: Restore dependencies
       run: dotnet restore
@@ -121,6 +116,3 @@ jobs:
         dotnet pack src/AspNetDebugDashboard/AspNetDebugDashboard.csproj --configuration Release --output ./test-packages
         ls -la ./test-packages/
         echo "✅ Package created successfully"
-    
-    - name: Remove temporary global.json
-      run: rm -f ./global.json
