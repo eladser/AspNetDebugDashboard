@@ -2,9 +2,9 @@ name: "CodeQL"
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main ]
   schedule:
     - cron: '0 8 * * 1'
 
@@ -26,24 +26,21 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Setup .NET 8.0
+    - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '8.0.x'
+        dotnet-version: |
+          8.0.x
+          9.0.x
+          10.0.x
 
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
       with:
         languages: ${{ matrix.language }}
 
-    - name: Clean solution
-      run: |
-        dotnet clean
-        find . -name "obj" -type d -exec rm -rf {} + 2>/dev/null || true
-        find . -name "bin" -type d -exec rm -rf {} + 2>/dev/null || true
-
     - name: Restore dependencies
-      run: dotnet restore --force --no-cache
+      run: dotnet restore
 
     - name: Build solution
       run: dotnet build --no-restore --configuration Release

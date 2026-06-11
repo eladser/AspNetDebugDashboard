@@ -2,247 +2,149 @@ using AspNetDebugDashboard.Core.Models;
 using AspNetDebugDashboard.Core.Services;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using System.Data.Common;
-using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Http;
 
 namespace AspNetDebugDashboard.Interceptors;
 
+// Records executed commands from EF's Executed/Failed callbacks. The command
+// itself is never touched: mutating CommandText mid-pipeline breaks providers
+// (SQLite throws if a reader is open) and changes what the database sees.
 public class DebugCommandInterceptor : DbCommandInterceptor
 {
     private readonly IServiceProvider _serviceProvider;
-    
+
     public DebugCommandInterceptor(IServiceProvider serviceProvider)
     {
         _serviceProvider = serviceProvider;
-    }
-
-    public override async ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
-        DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result,
-        CancellationToken cancellationToken = default)
-    {
-        LogCommand(command, eventData, "ExecuteReader");
-        return await base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
     }
 
     public override async ValueTask<DbDataReader> ReaderExecutedAsync(
         DbCommand command, CommandExecutedEventData eventData, DbDataReader result,
         CancellationToken cancellationToken = default)
     {
-        await LogCommandExecutedAsync(command, eventData, "ExecuteReader");
+        await LogAsync(command, eventData.Duration, true, null, null);
         return await base.ReaderExecutedAsync(command, eventData, result, cancellationToken);
     }
 
-    public override async ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
-        DbCommand command, CommandEventData eventData, InterceptionResult<int> result,
-        CancellationToken cancellationToken = default)
+    public override DbDataReader ReaderExecuted(
+        DbCommand command, CommandExecutedEventData eventData, DbDataReader result)
     {
-        LogCommand(command, eventData, "ExecuteNonQuery");
-        return await base.NonQueryExecutingAsync(command, eventData, result, cancellationToken);
+        LogFireAndForget(command, eventData.Duration, true, null, null);
+        return base.ReaderExecuted(command, eventData, result);
     }
 
     public override async ValueTask<int> NonQueryExecutedAsync(
         DbCommand command, CommandExecutedEventData eventData, int result,
         CancellationToken cancellationToken = default)
     {
-        await LogCommandExecutedAsync(command, eventData, "ExecuteNonQuery", result);
+        await LogAsync(command, eventData.Duration, true, null, result);
         return await base.NonQueryExecutedAsync(command, eventData, result, cancellationToken);
     }
 
-    public override async ValueTask<InterceptionResult<object>> ScalarExecutingAsync(
-        DbCommand command, CommandEventData eventData, InterceptionResult<object> result,
-        CancellationToken cancellationToken = default)
+    public override int NonQueryExecuted(
+        DbCommand command, CommandExecutedEventData eventData, int result)
     {
-        LogCommand(command, eventData, "ExecuteScalar");
-        return await base.ScalarExecutingAsync(command, eventData, result, cancellationToken);
+        LogFireAndForget(command, eventData.Duration, true, null, result);
+        return base.NonQueryExecuted(command, eventData, result);
     }
 
     public override async ValueTask<object?> ScalarExecutedAsync(
         DbCommand command, CommandExecutedEventData eventData, object? result,
         CancellationToken cancellationToken = default)
     {
-        await LogCommandExecutedAsync(command, eventData, "ExecuteScalar");
+        await LogAsync(command, eventData.Duration, true, null, null);
         return await base.ScalarExecutedAsync(command, eventData, result, cancellationToken);
+    }
+
+    public override object? ScalarExecuted(
+        DbCommand command, CommandExecutedEventData eventData, object? result)
+    {
+        LogFireAndForget(command, eventData.Duration, true, null, null);
+        return base.ScalarExecuted(command, eventData, result);
     }
 
     public override async Task CommandFailedAsync(
         DbCommand command, CommandErrorEventData eventData, CancellationToken cancellationToken = default)
     {
-        await LogCommandErrorAsync(command, eventData);
+        await LogAsync(command, eventData.Duration, false, eventData.Exception?.Message, null);
         await base.CommandFailedAsync(command, eventData, cancellationToken);
     }
 
-    private void LogCommand(DbCommand command, CommandEventData eventData, string commandType)
+    public override void CommandFailed(DbCommand command, CommandErrorEventData eventData)
     {
-        using var scope = _serviceProvider.CreateScope();
-        var storage = scope.ServiceProvider.GetService<IDebugStorage>();
-        var context = scope.ServiceProvider.GetService<DebugContext>();
-        var httpContextAccessor = scope.ServiceProvider.GetService<IHttpContextAccessor>();
-        
-        if (storage == null || context == null) return;
-        
+        LogFireAndForget(command, eventData.Duration, false, eventData.Exception?.Message, null);
+        base.CommandFailed(command, eventData);
+    }
+
+    private void LogFireAndForget(DbCommand command, TimeSpan duration, bool success, string? error, int? rowsAffected)
+    {
+        var entry = BuildEntry(command, duration, success, error, rowsAffected);
+        if (entry == null) return;
+        _ = Task.Run(() => StoreAsync(entry));
+    }
+
+    private async Task LogAsync(DbCommand command, TimeSpan duration, bool success, string? error, int? rowsAffected)
+    {
+        var entry = BuildEntry(command, duration, success, error, rowsAffected);
+        if (entry == null) return;
+        await StoreAsync(entry);
+    }
+
+    // Snapshot everything we need from the DbCommand synchronously — it may be
+    // disposed or reused by the time a background store task runs.
+    private SqlQueryEntry? BuildEntry(DbCommand command, TimeSpan duration, bool success, string? error, int? rowsAffected)
+    {
+        var config = _serviceProvider.GetService<IOptions<DebugConfiguration>>()?.Value;
+        if (config is not { IsEnabled: true, LogSqlQueries: true }) return null;
+
+        var httpContextAccessor = _serviceProvider.GetService<IHttpContextAccessor>();
         var requestId = httpContextAccessor?.HttpContext?.TraceIdentifier;
-        
-        var queryEntry = new SqlQueryEntry
+        var ms = (long)duration.TotalMilliseconds;
+
+        return new SqlQueryEntry
         {
             Query = command.CommandText,
             Parameters = GetParameters(command),
+            ExecutionTimeMs = ms,
+            RowsAffected = rowsAffected ?? 0,
             RequestId = requestId ?? string.Empty,
-            Database = GetDatabaseName(command),
-            ConnectionString = GetSafeConnectionString(command.Connection?.ConnectionString)
+            Database = command.Connection?.Database,
+            IsSuccessful = success,
+            Error = error,
+            IsSlowQuery = ms >= config.SlowQueryThresholdMs,
         };
-        
-        // Store the query start time for later duration calculation
-        command.CommandText = $"{command.CommandText}/*{queryEntry.Id}:{DateTime.UtcNow.Ticks}*/";
-        
-        if (!string.IsNullOrEmpty(requestId))
+    }
+
+    private async Task StoreAsync(SqlQueryEntry entry)
+    {
+        try
         {
-            context.AddSqlQuery(requestId, queryEntry);
+            var storage = _serviceProvider.GetService<IDebugStorage>();
+            if (storage == null) return;
+
+            await storage.StoreSqlQueryAsync(entry);
+
+            if (!string.IsNullOrEmpty(entry.RequestId))
+            {
+                _serviceProvider.GetService<DebugContext>()?.AddSqlQuery(entry.RequestId, entry);
+            }
+        }
+        catch
+        {
+            // a failure to record a query must never take the app down with it
         }
     }
 
-    private async Task LogCommandExecutedAsync(DbCommand command, CommandExecutedEventData eventData, string commandType, int? rowsAffected = null)
-    {
-        using var scope = _serviceProvider.CreateScope();
-        var storage = scope.ServiceProvider.GetService<IDebugStorage>();
-        
-        if (storage == null) return;
-        
-        // Extract query ID and start time from the modified command text
-        var (queryId, startTime) = ExtractQueryInfo(command.CommandText);
-        
-        if (string.IsNullOrEmpty(queryId)) return;
-        
-        var executionTime = DateTime.UtcNow.Ticks - startTime;
-        var executionTimeMs = executionTime / TimeSpan.TicksPerMillisecond;
-        
-        // Clean up the command text
-        command.CommandText = CleanCommandText(command.CommandText);
-        
-        var queryEntry = new SqlQueryEntry
-        {
-            Id = queryId,
-            Query = command.CommandText,
-            Parameters = GetParameters(command),
-            ExecutionTimeMs = executionTimeMs,
-            RowsAffected = rowsAffected ?? 0,
-            Database = GetDatabaseName(command),
-            ConnectionString = GetSafeConnectionString(command.Connection?.ConnectionString),
-            IsSuccessful = true
-        };
-        
-        await storage.StoreSqlQueryAsync(queryEntry);
-    }
-
-    private async Task LogCommandErrorAsync(DbCommand command, CommandErrorEventData eventData)
-    {
-        using var scope = _serviceProvider.CreateScope();
-        var storage = scope.ServiceProvider.GetService<IDebugStorage>();
-        
-        if (storage == null) return;
-        
-        var (queryId, startTime) = ExtractQueryInfo(command.CommandText);
-        
-        if (string.IsNullOrEmpty(queryId)) return;
-        
-        var executionTime = DateTime.UtcNow.Ticks - startTime;
-        var executionTimeMs = executionTime / TimeSpan.TicksPerMillisecond;
-        
-        command.CommandText = CleanCommandText(command.CommandText);
-        
-        var queryEntry = new SqlQueryEntry
-        {
-            Id = queryId,
-            Query = command.CommandText,
-            Parameters = GetParameters(command),
-            ExecutionTimeMs = executionTimeMs,
-            Database = GetDatabaseName(command),
-            ConnectionString = GetSafeConnectionString(command.Connection?.ConnectionString),
-            IsSuccessful = false,
-            Error = eventData.Exception?.Message
-        };
-        
-        await storage.StoreSqlQueryAsync(queryEntry);
-    }
-
-    private Dictionary<string, object> GetParameters(DbCommand command)
+    private static Dictionary<string, object> GetParameters(DbCommand command)
     {
         var parameters = new Dictionary<string, object>();
-        
         foreach (DbParameter parameter in command.Parameters)
         {
             var value = parameter.Value;
-            if (value == DBNull.Value)
-            {
-                value = null;
-            }
-            
-            parameters[parameter.ParameterName] = value ?? "NULL";
+            parameters[parameter.ParameterName] = value == null || value == DBNull.Value ? "NULL" : value;
         }
-        
         return parameters;
-    }
-
-    private string? GetDatabaseName(DbCommand command)
-    {
-        return command.Connection?.Database;
-    }
-
-    private string? GetSafeConnectionString(string? connectionString)
-    {
-        if (string.IsNullOrEmpty(connectionString)) return null;
-        
-        // Remove sensitive information from connection string
-        var parts = connectionString.Split(';');
-        var safeParts = new List<string>();
-        
-        foreach (var part in parts)
-        {
-            var keyValue = part.Split('=', 2);
-            if (keyValue.Length == 2)
-            {
-                var key = keyValue[0].Trim().ToLower();
-                if (key.Contains("password") || key.Contains("pwd") || key.Contains("secret"))
-                {
-                    safeParts.Add($"{keyValue[0]}=***");
-                }
-                else
-                {
-                    safeParts.Add(part);
-                }
-            }
-        }
-        
-        return string.Join(";", safeParts);
-    }
-
-    private (string queryId, long startTime) ExtractQueryInfo(string commandText)
-    {
-        var lastCommentIndex = commandText.LastIndexOf("/*");
-        if (lastCommentIndex == -1) return (string.Empty, 0);
-        
-        var endCommentIndex = commandText.IndexOf("*/", lastCommentIndex);
-        if (endCommentIndex == -1) return (string.Empty, 0);
-        
-        var comment = commandText.Substring(lastCommentIndex + 2, endCommentIndex - lastCommentIndex - 2);
-        var parts = comment.Split(':');
-        
-        if (parts.Length == 2 && long.TryParse(parts[1], out var startTime))
-        {
-            return (parts[0], startTime);
-        }
-        
-        return (string.Empty, 0);
-    }
-
-    private string CleanCommandText(string commandText)
-    {
-        var lastCommentIndex = commandText.LastIndexOf("/*");
-        if (lastCommentIndex == -1) return commandText;
-        
-        var endCommentIndex = commandText.IndexOf("*/", lastCommentIndex);
-        if (endCommentIndex == -1) return commandText;
-        
-        return commandText.Substring(0, lastCommentIndex) + commandText.Substring(endCommentIndex + 2);
     }
 }

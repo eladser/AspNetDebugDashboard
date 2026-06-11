@@ -29,10 +29,11 @@ builder.Services.AddDebugDashboard(config =>
     config.MaxEntries = 1000;
 });
 
-// Add Entity Framework - simplified without interceptor for now
-builder.Services.AddDbContext<SampleDbContext>(options =>
+// SQLite so the EF interceptor has real SQL to capture
+builder.Services.AddDbContext<SampleDbContext>((sp, options) =>
 {
-    options.UseInMemoryDatabase("SampleDb");
+    options.UseSqlite("Data Source=sample.db");
+    options.AddDebugDashboard(sp);
 });
 
 // Add sample services
