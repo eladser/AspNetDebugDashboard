@@ -1,33 +1,67 @@
+import { useMemo } from 'react';
 import { api } from '../api';
-import { fmtDuration, fmtTime } from '../format';
-import { EmptyState, ErrorState, Pager, SearchBox, Skeleton } from '../ui';
-import { useList } from '../useList';
+import { Chip, Duration, EmptyState, ErrorState, FootBar, RelTime, SearchBox, Skeleton, SortHeader } from '../ui';
+import { useList, useRowNav } from '../useList';
 import type { DetailRef } from './Detail';
 
-export function Queries({ tick, onOpen }: { tick: number; onOpen: (ref: DetailRef) => void }) {
-  const { query, patch, setPage, data, error, loading, reload } = useList(api.queries, tick);
+const SETUP = `builder.Services.AddDbContext<AppDbContext>((sp, options) =>
+{
+    options.UseSqlServer(connectionString);
+    options.AddDebugDashboard(sp);
+});`;
+
+export function Queries({
+  tick,
+  navEnabled,
+  searchRef,
+  onOpen,
+}: {
+  tick: number;
+  navEnabled: boolean;
+  searchRef: React.RefObject<HTMLInputElement>;
+  onOpen: (ref: DetailRef) => void;
+}) {
+  const { query, patch, toggleSort, setPage, data, error, loading, reload } = useList(api.queries, tick);
+  const items = data?.items ?? [];
+  const { sel, setSel } = useRowNav(items, (q) => onOpen({ kind: 'query', id: q.id }), navEnabled);
+  const maxMs = useMemo(() => Math.max(...items.map((q) => q.executionTimeMs), 1), [items]);
+
+  const hasFilters = !!(query.search || query.isSlowQuery !== undefined || query.isSuccessful !== undefined);
 
   return (
     <>
       <div className="filters">
         <SearchBox
+          inputRef={searchRef}
           value={query.search ?? ''}
           onChange={(search) => patch({ search: search || undefined })}
-          placeholder="Search SQL…"
+          placeholder="Filter by SQL text…"
         />
-        {data && <span className="result-count">{data.totalCount.toLocaleString()} total</span>}
+        <Chip
+          label="Slow only"
+          tone="warn"
+          on={query.isSlowQuery === true}
+          onClick={() => patch({ isSlowQuery: query.isSlowQuery ? undefined : true })}
+        />
+        <Chip
+          label="Failed only"
+          tone="err"
+          on={query.isSuccessful === false}
+          onClick={() => patch({ isSuccessful: query.isSuccessful === false ? undefined : false })}
+        />
       </div>
 
       {error ? (
         <ErrorState message={error} onRetry={reload} />
       ) : loading && !data ? (
         <div className="table-wrap"><Skeleton /></div>
-      ) : !data || data.items.length === 0 ? (
+      ) : items.length === 0 ? (
         <EmptyState
           title="No SQL queries captured"
-          hint={query.search
-            ? 'Nothing matches the current search.'
-            : <>Wire up the EF Core interceptor with <code>options.AddDebugDashboard()</code> to capture queries.</>}
+          hint={hasFilters
+            ? 'Nothing matches the current filters.'
+            : 'Attach the EF Core interceptor when registering your DbContext:'}
+          snippet={hasFilters ? undefined : SETUP}
         />
       ) : (
         <div className="table-wrap">
@@ -35,29 +69,34 @@ export function Queries({ tick, onOpen }: { tick: number; onOpen: (ref: DetailRe
             <thead>
               <tr>
                 <th>Query</th>
-                <th className="num fit">Duration</th>
+                <SortHeader label="Duration" field="executiontimems" query={query} onSort={toggleSort} className="num fit" />
                 <th className="num fit">Rows</th>
-                <th className="fit">Time</th>
+                <SortHeader label="When" field="timestamp" query={query} onSort={toggleSort} className="fit" />
               </tr>
             </thead>
             <tbody>
-              {data.items.map((q) => (
-                <tr key={q.id} onClick={() => onOpen({ kind: 'query', id: q.id })}>
-                  <td className="primary" style={{ maxWidth: 560 }} title={q.query}>
-                    {!q.isSuccessful && <span className="status s5">✕ </span>}
-                    {q.isSlowQuery && <span className="slow-mark">⏱ </span>}
+              {items.map((q, i) => (
+                <tr
+                  key={q.id}
+                  className={i === sel ? 'sel' : ''}
+                  onClick={() => { setSel(i); onOpen({ kind: 'query', id: q.id }); }}
+                >
+                  <td className="primary" style={{ maxWidth: 600 }} title={q.query}>
+                    {!q.isSuccessful && <span className="status s5" style={{ marginRight: 6 }} />}
                     {q.query}
                   </td>
-                  <td className={`num fit${q.isSlowQuery ? ' slow-mark' : ''}`}>{fmtDuration(q.executionTimeMs)}</td>
-                  <td className="num dim fit">{q.rowsAffected >= 0 ? q.rowsAffected : ''}</td>
-                  <td className="dim fit">{fmtTime(q.timestamp)}</td>
+                  <td className="num fit">
+                    <Duration ms={q.executionTimeMs} max={maxMs} slow={q.isSlowQuery} />
+                  </td>
+                  <td className="num dim fit">{q.rowsAffected > 0 ? q.rowsAffected : ''}</td>
+                  <td className="dim fit"><RelTime iso={q.timestamp} tick={tick} /></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
-      {data && <Pager result={data} onPage={setPage} />}
+      <FootBar result={data} onPage={setPage} />
     </>
   );
 }

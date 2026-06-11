@@ -40,7 +40,7 @@ public class PerformanceTests
         var middleware = new DebugRequestMiddleware(
             async context => await Task.Delay(50), // Simulate some work
             _mockOptions.Object, 
-            _mockStorage.Object);
+            _mockStorage.Object, new DebugContext());
 
         _mockStorage.Setup(x => x.StoreRequestAsync(It.IsAny<RequestEntry>()))
                    .ReturnsAsync("test-id");
@@ -64,7 +64,7 @@ public class PerformanceTests
         var middleware = new DebugRequestMiddleware(
             async context => await Task.CompletedTask,
             _mockOptions.Object, 
-            _mockStorage.Object);
+            _mockStorage.Object, new DebugContext());
 
         _mockStorage.Setup(x => x.StoreRequestAsync(It.IsAny<RequestEntry>()))
                    .ReturnsAsync("test-id");
@@ -92,7 +92,7 @@ public class PerformanceTests
         var middleware = new DebugRequestMiddleware(
             async context => await Task.Delay(10),
             _mockOptions.Object, 
-            _mockStorage.Object);
+            _mockStorage.Object, new DebugContext());
 
         _mockStorage.Setup(x => x.StoreRequestAsync(It.IsAny<RequestEntry>()))
                    .ReturnsAsync("test-id");
@@ -123,7 +123,7 @@ public class PerformanceTests
         var middleware = new DebugRequestMiddleware(
             async context => await Task.Delay(10),
             _mockOptions.Object, 
-            _mockStorage.Object);
+            _mockStorage.Object, new DebugContext());
 
         var context = CreateHttpContext();
         var stopwatch = Stopwatch.StartNew();
@@ -144,7 +144,7 @@ public class PerformanceTests
         var middleware = new DebugRequestMiddleware(
             async context => await Task.CompletedTask,
             _mockOptions.Object, 
-            _mockStorage.Object);
+            _mockStorage.Object, new DebugContext());
 
         _mockStorage.Setup(x => x.StoreRequestAsync(It.IsAny<RequestEntry>()))
                    .ReturnsAsync("test-id");
@@ -178,7 +178,7 @@ public class PerformanceTests
         var middleware = new DebugRequestMiddleware(
             async context => await Task.CompletedTask,
             _mockOptions.Object, 
-            _mockStorage.Object);
+            _mockStorage.Object, new DebugContext());
 
         _mockStorage.Setup(x => x.StoreRequestAsync(It.IsAny<RequestEntry>()))
                    .ReturnsAsync("test-id");

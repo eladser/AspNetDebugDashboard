@@ -5,10 +5,7 @@ import { fmtDuration, timeAgo } from '../format';
 import { ErrorState, MethodTag, Skeleton } from '../ui';
 
 const STATUS_COLORS: Record<string, string> = {
-  '2': 'var(--ok)',
-  '3': 'var(--info)',
-  '4': 'var(--warn)',
-  '5': 'var(--err)',
+  '2': 'var(--ok)', '3': 'var(--info)', '4': 'var(--warn)', '5': 'var(--err)',
 };
 
 function StatusDistribution({ dist }: { dist: Record<string, number> }) {
@@ -21,10 +18,7 @@ function StatusDistribution({ dist }: { dist: Record<string, number> }) {
         {entries.map(([code, n]) => (
           <div
             key={code}
-            style={{
-              width: `${(n / total) * 100}%`,
-              background: STATUS_COLORS[code[0]] ?? 'var(--text-faint)',
-            }}
+            style={{ width: `${(n / total) * 100}%`, background: STATUS_COLORS[code[0]] ?? 'var(--faint)' }}
             title={`${code}: ${n}`}
           />
         ))}
@@ -32,28 +26,12 @@ function StatusDistribution({ dist }: { dist: Record<string, number> }) {
       <div className="dist-legend">
         {entries.map(([code, n]) => (
           <span key={code}>
-            <span className="swatch" style={{ background: STATUS_COLORS[code[0]] ?? 'var(--text-faint)' }} />
+            <span className="swatch" style={{ background: STATUS_COLORS[code[0]] ?? 'var(--faint)' }} />
             {code} · {n}
           </span>
         ))}
       </div>
     </>
-  );
-}
-
-function MethodDistribution({ dist }: { dist: Record<string, number> }) {
-  const entries = Object.entries(dist).sort(([, a], [, b]) => b - a);
-  if (entries.length === 0) return <div className="dist-legend">No requests yet</div>;
-  return (
-    <div className="mini-list">
-      {entries.map(([method, n]) => (
-        <div key={method} className="mini-row" style={{ cursor: 'default' }}>
-          <MethodTag method={method} />
-          <span className="grow" />
-          <span>{n}</span>
-        </div>
-      ))}
-    </div>
   );
 }
 
@@ -83,25 +61,32 @@ export function Overview({
   }, [tick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (error && !loaded.current) return <ErrorState message={error} onRetry={load} />;
-  if (!stats) return <div className="overview"><Skeleton rows={10} /></div>;
+  if (!stats) return <div className="page-scroll"><Skeleton rows={10} /></div>;
+
+  const totalReqs = Object.values(stats.statusCodeDistribution).reduce((s, n) => s + n, 0);
+  const failed = Object.entries(stats.statusCodeDistribution)
+    .filter(([c]) => Number(c) >= 400)
+    .reduce((s, [, n]) => s + n, 0);
+  const errorRate = totalReqs > 0 ? (failed / totalReqs) * 100 : 0;
 
   const counters = [
-    { label: 'Requests', value: stats.totalRequests },
-    { label: 'SQL queries', value: stats.totalSqlQueries },
-    { label: 'Logs', value: stats.totalLogs },
-    { label: 'Exceptions', value: stats.totalExceptions, alert: stats.totalExceptions > 0 },
+    { label: 'Requests', value: stats.totalRequests.toLocaleString() },
+    { label: 'SQL queries', value: stats.totalSqlQueries.toLocaleString() },
+    { label: 'Logs', value: stats.totalLogs.toLocaleString() },
+    { label: 'Exceptions', value: stats.totalExceptions.toLocaleString(), err: stats.totalExceptions > 0 },
+    { label: 'Error rate', value: `${errorRate.toFixed(1)}%`, err: errorRate > 5 },
     { label: 'Avg response', value: fmtDuration(stats.averageResponseTime) },
     { label: 'Avg query', value: fmtDuration(stats.averageSqlTime) },
   ];
 
+  const exTypes = Object.entries(stats.exceptionTypeDistribution).sort(([, a], [, b]) => b - a).slice(0, 8);
+
   return (
-    <div className="overview">
+    <div className="page-scroll">
       <div className="stat-row">
         {counters.map((c) => (
           <div key={c.label} className="stat">
-            <div className="value" style={c.alert ? { color: 'var(--err)' } : undefined}>
-              {typeof c.value === 'number' ? c.value.toLocaleString() : c.value}
-            </div>
+            <div className={`value${c.err ? ' err' : ''}`}>{c.value}</div>
             <div className="label">{c.label}</div>
           </div>
         ))}
@@ -114,7 +99,21 @@ export function Overview({
         </div>
         <div>
           <h2 className="section-title">Methods</h2>
-          <MethodDistribution dist={stats.requestMethodDistribution} />
+          {Object.keys(stats.requestMethodDistribution).length === 0 ? (
+            <div className="dist-legend">No requests yet</div>
+          ) : (
+            <div className="mini-list">
+              {Object.entries(stats.requestMethodDistribution)
+                .sort(([, a], [, b]) => b - a)
+                .map(([method, n]) => (
+                  <div key={method} className="mini-row static">
+                    <MethodTag method={method} />
+                    <span className="grow" />
+                    <span className="n">{n}</span>
+                  </div>
+                ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -151,6 +150,23 @@ export function Overview({
           )}
         </div>
       </div>
+
+      {exTypes.length > 0 && (
+        <div className="two-col">
+          <div>
+            <h2 className="section-title">Exception types</h2>
+            <div className="mini-list">
+              {exTypes.map(([type, n]) => (
+                <div key={type} className="mini-row static">
+                  <span className="grow" style={{ color: 'var(--err)' }}>{type.split('.').pop()}</span>
+                  <span className="n">×{n}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div />
+        </div>
+      )}
 
       <div className="dist-legend">Updated {timeAgo(stats.lastUpdated)}</div>
     </div>

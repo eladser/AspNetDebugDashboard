@@ -16,18 +16,20 @@ public class DebugLogger : IDebugLogger
 {
     private readonly IDebugStorage _storage;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly DebugContext _debugContext;
 
-    public DebugLogger(IDebugStorage storage, IHttpContextAccessor httpContextAccessor)
+    public DebugLogger(IDebugStorage storage, IHttpContextAccessor httpContextAccessor, DebugContext debugContext)
     {
         _storage = storage;
         _httpContextAccessor = httpContextAccessor;
+        _debugContext = debugContext;
     }
 
     public async Task LogAsync(string message, string level = "Info", string? tag = null, Dictionary<string, object>? properties = null)
     {
         var context = _httpContextAccessor.HttpContext;
         var requestId = context?.TraceIdentifier;
-        
+
         var logEntry = new LogEntry
         {
             Message = message,
@@ -38,6 +40,12 @@ public class DebugLogger : IDebugLogger
         };
 
         await _storage.StoreLogAsync(logEntry);
+
+        // attach to the in-flight request so it shows up in the request detail
+        if (!string.IsNullOrEmpty(requestId))
+        {
+            _debugContext.AddLog(requestId, logEntry);
+        }
     }
 
     public async Task LogInfoAsync(string message, string? tag = null, Dictionary<string, object>? properties = null)

@@ -49,10 +49,13 @@ builder.Services.AddDbContext<AppDbContext>((sp, options) =>
 
 ## What it captures
 
-- **Requests** — method, path, status, timing, headers, request/response bodies, client info. Each request links to the SQL queries and logs it produced.
-- **SQL queries** — full query text, parameters, execution time, row counts. Slow queries (default: over 1s) get flagged.
+- **Requests** — method, path, status, timing, headers, request/response bodies, client info. Each request links to the SQL queries and logs it produced, and can be copied as a cURL command to replay it.
+- **SQL queries** — full query text with syntax highlighting, parameters, execution time, row counts. Slow queries get flagged, and a request that runs the same query three or more times gets an N+1 warning.
 - **Exceptions** — type, message, stack trace, inner exceptions, the route that threw.
 - **Logs** — written through `IDebugLogger`, with levels, categories, and structured properties.
+- **Performance** — req/min, average, median, P95/P99 response times, error rate, and slowest endpoints over the last hour.
+
+Global search (`Ctrl+K`) covers all of it, and the tables sort, filter, and navigate from the keyboard (`j`/`k`, `Enter`, `/`).
 
 ![Request detail](docs/images/request-detail.png)
 

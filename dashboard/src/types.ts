@@ -125,4 +125,31 @@ export interface ListQuery {
   method?: string;
   statusCode?: number;
   level?: string;
+  isSuccessful?: boolean;
+  isSlowQuery?: boolean;
+  minExecutionTime?: number;
+  requestId?: string;
+}
+
+export interface EndpointPerf {
+  endpoint: string;
+  averageTime: number;
+  requestCount: number;
+}
+
+export interface PerfMetrics {
+  totalRequests: number;
+  averageResponseTime: number;
+  medianResponseTime: number;
+  p95ResponseTime: number;
+  p99ResponseTime: number;
+  errorRate: number;
+  requestsPerMinute: number;
+  slowestEndpoints: EndpointPerf[];
+  statusCodeDistribution: { statusCode: number; count: number; percentage: number }[];
+}
+
+export interface SearchHit {
+  type: 'request' | 'query' | 'log' | 'exception';
+  data: Record<string, unknown>;
 }

@@ -13,12 +13,14 @@ public class DebugRequestMiddleware
     private readonly RequestDelegate _next;
     private readonly DebugConfiguration _config;
     private readonly IDebugStorage _storage;
+    private readonly DebugContext _debugContext;
 
-    public DebugRequestMiddleware(RequestDelegate next, IOptions<DebugConfiguration> config, IDebugStorage storage)
+    public DebugRequestMiddleware(RequestDelegate next, IOptions<DebugConfiguration> config, IDebugStorage storage, DebugContext debugContext)
     {
         _next = next;
         _config = config.Value;
         _storage = storage;
+        _debugContext = debugContext;
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -33,6 +35,10 @@ public class DebugRequestMiddleware
         var requestId = context.TraceIdentifier;
         var requestBody = "";
         var responseBody = "";
+
+        // Register the request so the EF interceptor and IDebugLogger can
+        // attach queries/logs to it while it's in flight.
+        _debugContext.StartRequest(requestId, new RequestEntry { RequestId = requestId });
 
         try
         {
@@ -152,26 +158,39 @@ public class DebugRequestMiddleware
                 }
             }
 
+            var request = context.Request;
             var requestEntry = new RequestEntry
             {
                 Id = Guid.NewGuid().ToString(),
                 RequestId = requestId,
-                Method = context.Request.Method,
-                Path = context.Request.Path + context.Request.QueryString,
+                Method = request.Method,
+                Path = request.Path,
+                QueryString = request.QueryString.HasValue ? request.QueryString.Value! : "",
+                Url = $"{request.Scheme}://{request.Host}{request.Path}{request.QueryString}",
+                Protocol = request.Protocol,
+                IsHttps = request.IsHttps,
                 Headers = headers,
                 RequestBody = requestBody,
                 ResponseBody = responseBody,
                 StatusCode = context.Response.StatusCode,
                 ExecutionTimeMs = elapsedMs,
                 Timestamp = DateTime.UtcNow,
-                UserAgent = context.Request.Headers.UserAgent.ToString(),
+                UserAgent = request.Headers.UserAgent.ToString(),
                 IPAddress = GetClientIpAddress(context),
-                ContentType = context.Request.ContentType,
+                ContentType = request.ContentType,
                 ResponseContentType = context.Response.ContentType,
-                RequestSize = context.Request.ContentLength ?? 0,
+                RequestSize = request.ContentLength ?? 0,
                 ResponseSize = context.Response.ContentLength ?? 0,
                 Exception = exception?.ToString()
             };
+
+            // Pull in whatever the interceptor and logger attached during the request
+            var tracked = _debugContext.CompleteRequest(requestId);
+            if (tracked != null)
+            {
+                requestEntry.SqlQueries = tracked.SqlQueries;
+                requestEntry.Logs = tracked.Logs;
+            }
 
             await _storage.StoreRequestAsync(requestEntry);
 

@@ -96,15 +96,32 @@ public class LiteDbStorage : IDebugStorage
             var query = _requests.Query();
             
             ApplyCommonFilters(query, filter);
-            
+
             if (!string.IsNullOrEmpty(filter.Method))
                 query = query.Where(x => x.Method == filter.Method);
-            
+
             if (!string.IsNullOrEmpty(filter.Path))
                 query = query.Where(x => x.Path.Contains(filter.Path));
-            
+
             if (!string.IsNullOrEmpty(filter.StatusCode) && int.TryParse(filter.StatusCode, out var statusCode))
                 query = query.Where(x => x.StatusCode == statusCode);
+
+            if (!string.IsNullOrEmpty(filter.Search))
+                query = query.Where(x => x.Path.Contains(filter.Search) || x.Url.Contains(filter.Search));
+
+            if (!string.IsNullOrEmpty(filter.RequestId))
+                query = query.Where(x => x.RequestId == filter.RequestId);
+
+            // IsSuccessful=false means "failed only" (4xx/5xx)
+            if (filter.IsSuccessful.HasValue)
+            {
+                query = filter.IsSuccessful.Value
+                    ? query.Where(x => x.StatusCode < 400)
+                    : query.Where(x => x.StatusCode >= 400);
+            }
+
+            if (filter.MinExecutionTime.HasValue)
+                query = query.Where(x => x.ExecutionTimeMs >= filter.MinExecutionTime.Value);
             
             var totalCount = query.Count();
             
@@ -130,11 +147,20 @@ public class LiteDbStorage : IDebugStorage
         return await Task.Run(() =>
         {
             var query = _sqlQueries.Query();
-            
+
             ApplyCommonFilters(query, filter);
-            
+
             if (!string.IsNullOrEmpty(filter.Search))
                 query = query.Where(x => x.Query.Contains(filter.Search));
+
+            if (!string.IsNullOrEmpty(filter.RequestId))
+                query = query.Where(x => x.RequestId == filter.RequestId);
+
+            if (filter.IsSlowQuery.HasValue)
+                query = query.Where(x => x.IsSlowQuery == filter.IsSlowQuery.Value);
+
+            if (filter.IsSuccessful.HasValue)
+                query = query.Where(x => x.IsSuccessful == filter.IsSuccessful.Value);
             
             var totalCount = query.Count();
             

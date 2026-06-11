@@ -4,7 +4,9 @@ import type {
   ListQuery,
   LogEntry,
   PagedResult,
+  PerfMetrics,
   RequestEntry,
+  SearchHit,
   SqlQueryEntry,
 } from './types';
 
@@ -35,6 +37,10 @@ function listUrl(resource: string, q: ListQuery): string {
   if (q.method) p.set('method', q.method);
   if (q.statusCode) p.set('statusCode', String(q.statusCode));
   if (q.level) p.set('level', q.level);
+  if (q.isSuccessful !== undefined) p.set('isSuccessful', String(q.isSuccessful));
+  if (q.isSlowQuery !== undefined) p.set('isSlowQuery', String(q.isSlowQuery));
+  if (q.minExecutionTime !== undefined) p.set('minExecutionTime', String(q.minExecutionTime));
+  if (q.requestId) p.set('requestId', q.requestId);
   return `${apiBase}/${resource}?${p}`;
 }
 
@@ -56,6 +62,11 @@ export const api = {
   exceptions: (q: ListQuery, signal?: AbortSignal) =>
     getJson<PagedResult<ExceptionEntry>>(listUrl('exceptions', q), signal),
   exception: (id: string) => getJson<ExceptionEntry>(`${apiBase}/exceptions/${id}`),
+
+  performance: (signal?: AbortSignal) => getJson<PerfMetrics>(`${apiBase}/performance`, signal),
+
+  search: (term: string, signal?: AbortSignal) =>
+    getJson<SearchHit[]>(`${apiBase}/search?term=${encodeURIComponent(term)}`, signal),
 
   clearAll: () => fetch(`${apiBase}/clear`, { method: 'DELETE' }),
   exportUrl: `${apiBase}/export`,
