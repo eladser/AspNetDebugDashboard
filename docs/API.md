@@ -377,6 +377,41 @@ Returns current configuration.
 }
 ```
 
+### GET `/_debug/api/performance`
+
+Metrics computed over the last 60 minutes of requests.
+
+**Response:**
+```json
+{
+  "totalRequests": 412,
+  "averageResponseTime": 38.2,
+  "medianResponseTime": 11.0,
+  "p95ResponseTime": 240.0,
+  "p99ResponseTime": 1100.0,
+  "errorRate": 2.4,
+  "requestsPerMinute": 6.9,
+  "slowestEndpoints": [
+    { "endpoint": "GET /api/reports", "averageTime": 480.5, "requestCount": 12 }
+  ],
+  "statusCodeDistribution": [
+    { "statusCode": 200, "count": 396, "percentage": 96.1 }
+  ]
+}
+```
+
+### GET `/_debug/api/search?term={text}&types={types}`
+
+Searches across entry types. `types` is optional (`requests`, `queries`, `logs`, `exceptions`); without it all types are searched. Returns up to 50 hits as `{ "type": "...", "data": { ... } }` pairs.
+
+### GET `/_debug/api/export`
+
+Downloads everything (stats, requests, queries, logs, exceptions) as a single JSON file.
+
+### GET `/_debug/api/health`
+
+Storage health plus the active configuration. Useful for checking the dashboard is wired up.
+
 ## Programming Interface
 
 ### IDebugLogger Interface

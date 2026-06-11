@@ -14,6 +14,7 @@ The dashboard UI was rebuilt from scratch and the supported framework range was 
 - Cross-links from a query, log, or exception to the request that produced it.
 - Column sorting, "Failed only" / "Slow only" filter chips, and keyboard navigation (`j`/`k` rows, `Enter` open, `/` filter, `Esc` close).
 - Relative timestamps with the exact time on hover.
+- Package icon and repository branding (logo, README banner, social preview image, demo GIF).
 
 ### Changed
 - New dashboard UI: a Vite + React + TypeScript app compiled to a single self-contained HTML file and embedded in the assembly. The old page pulled React, Babel, Tailwind, and Font Awesome from CDNs at runtime and only showed counters.
