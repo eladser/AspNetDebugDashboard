@@ -8,6 +8,7 @@
 [![NuGet](https://img.shields.io/nuget/v/AspNetDebugDashboard.svg)](https://www.nuget.org/packages/AspNetDebugDashboard/)
 [![Downloads](https://img.shields.io/nuget/dt/AspNetDebugDashboard.svg)](https://www.nuget.org/packages/AspNetDebugDashboard/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-support-ff5e5b?logo=kofi&logoColor=white)](https://ko-fi.com/eladser)
 
 Request, SQL query, log, and exception capture for ASP.NET Core, viewable in a dashboard at `/_debug`. Think Laravel Telescope, but for .NET.
 
@@ -206,6 +207,10 @@ npm run build  # writes src/AspNetDebugDashboard/wwwroot/index.html
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full dev loop.
+
+## Support
+
+If this tool saves you some debugging time, you can [buy me a coffee](https://ko-fi.com/eladser).
 
 ## License
 
