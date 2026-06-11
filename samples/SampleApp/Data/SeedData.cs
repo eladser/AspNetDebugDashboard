@@ -6,6 +6,8 @@ public static class SeedData
 {
     public static async Task SeedAsync(SampleDbContext context)
     {
+        await context.Database.EnsureCreatedAsync();
+
         if (context.Products.Any())
             return;
 
@@ -20,9 +22,9 @@ public static class SeedData
 
         var customers = new List<Customer>
         {
-            new Customer { Name = "John Doe", Email = "john@example.com" },
-            new Customer { Name = "Jane Smith", Email = "jane@example.com" },
-            new Customer { Name = "Bob Johnson", Email = "bob@example.com" }
+            new Customer { Name = "Maya Lindqvist", Email = "maya.l@example.com" },
+            new Customer { Name = "Tomer Avidan", Email = "tomer.avidan@example.com" },
+            new Customer { Name = "Priya Raghavan", Email = "p.raghavan@example.com" }
         };
 
         context.Products.AddRange(products);

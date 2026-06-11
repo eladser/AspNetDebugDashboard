@@ -44,7 +44,7 @@ public class DebugRequestMiddlewareTests
     {
         // Arrange
         _config.IsEnabled = false;
-        var middleware = new DebugRequestMiddleware(_mockNext.Object, _mockOptions.Object, _mockStorage.Object);
+        var middleware = new DebugRequestMiddleware(_mockNext.Object, _mockOptions.Object, _mockStorage.Object, new DebugContext());
         var context = CreateHttpContext();
 
         // Act
@@ -59,7 +59,7 @@ public class DebugRequestMiddlewareTests
     public async Task InvokeAsync_WithExcludedPath_CallsNextWithoutLogging()
     {
         // Arrange
-        var middleware = new DebugRequestMiddleware(_mockNext.Object, _mockOptions.Object, _mockStorage.Object);
+        var middleware = new DebugRequestMiddleware(_mockNext.Object, _mockOptions.Object, _mockStorage.Object, new DebugContext());
         var context = CreateHttpContext();
         context.Request.Path = "/health";
 
@@ -75,7 +75,7 @@ public class DebugRequestMiddlewareTests
     public async Task InvokeAsync_WithDebugPath_CallsNextWithoutLogging()
     {
         // Arrange
-        var middleware = new DebugRequestMiddleware(_mockNext.Object, _mockOptions.Object, _mockStorage.Object);
+        var middleware = new DebugRequestMiddleware(_mockNext.Object, _mockOptions.Object, _mockStorage.Object, new DebugContext());
         var context = CreateHttpContext();
         context.Request.Path = "/_debug/api/stats";
 
@@ -91,7 +91,7 @@ public class DebugRequestMiddlewareTests
     public async Task InvokeAsync_WithStaticFile_CallsNextWithoutLogging()
     {
         // Arrange
-        var middleware = new DebugRequestMiddleware(_mockNext.Object, _mockOptions.Object, _mockStorage.Object);
+        var middleware = new DebugRequestMiddleware(_mockNext.Object, _mockOptions.Object, _mockStorage.Object, new DebugContext());
         var context = CreateHttpContext();
         context.Request.Path = "/css/style.css";
 
@@ -107,7 +107,7 @@ public class DebugRequestMiddlewareTests
     public async Task InvokeAsync_WithValidRequest_LogsRequest()
     {
         // Arrange
-        var middleware = new DebugRequestMiddleware(_mockNext.Object, _mockOptions.Object, _mockStorage.Object);
+        var middleware = new DebugRequestMiddleware(_mockNext.Object, _mockOptions.Object, _mockStorage.Object, new DebugContext());
         var context = CreateHttpContext();
         context.Request.Method = "POST";
         context.Request.Path = "/api/test";
@@ -134,7 +134,7 @@ public class DebugRequestMiddlewareTests
     public async Task InvokeAsync_WithRequestBody_CapturesBody()
     {
         // Arrange
-        var middleware = new DebugRequestMiddleware(_mockNext.Object, _mockOptions.Object, _mockStorage.Object);
+        var middleware = new DebugRequestMiddleware(_mockNext.Object, _mockOptions.Object, _mockStorage.Object, new DebugContext());
         var context = CreateHttpContext();
         
         var requestBody = "{\"test\": \"data\"}";
@@ -161,7 +161,7 @@ public class DebugRequestMiddlewareTests
     {
         // Arrange
         _config.MaxBodySize = 10; // Very small limit
-        var middleware = new DebugRequestMiddleware(_mockNext.Object, _mockOptions.Object, _mockStorage.Object);
+        var middleware = new DebugRequestMiddleware(_mockNext.Object, _mockOptions.Object, _mockStorage.Object, new DebugContext());
         var context = CreateHttpContext();
         
         var largeBody = new string('x', 1000);
@@ -186,7 +186,7 @@ public class DebugRequestMiddlewareTests
     public async Task InvokeAsync_WithException_LogsException()
     {
         // Arrange
-        var middleware = new DebugRequestMiddleware(_mockNext.Object, _mockOptions.Object, _mockStorage.Object);
+        var middleware = new DebugRequestMiddleware(_mockNext.Object, _mockOptions.Object, _mockStorage.Object, new DebugContext());
         var context = CreateHttpContext();
         
         var expectedException = new InvalidOperationException("Test exception");
@@ -214,7 +214,7 @@ public class DebugRequestMiddlewareTests
     public async Task InvokeAsync_WithExcludedHeaders_FiltersHeaders()
     {
         // Arrange
-        var middleware = new DebugRequestMiddleware(_mockNext.Object, _mockOptions.Object, _mockStorage.Object);
+        var middleware = new DebugRequestMiddleware(_mockNext.Object, _mockOptions.Object, _mockStorage.Object, new DebugContext());
         var context = CreateHttpContext();
         
         context.Request.Headers["Authorization"] = "Bearer token";
@@ -242,7 +242,7 @@ public class DebugRequestMiddlewareTests
     public async Task InvokeAsync_CapturesClientIpAddress(string? remoteIp, string expectedIp)
     {
         // Arrange
-        var middleware = new DebugRequestMiddleware(_mockNext.Object, _mockOptions.Object, _mockStorage.Object);
+        var middleware = new DebugRequestMiddleware(_mockNext.Object, _mockOptions.Object, _mockStorage.Object, new DebugContext());
         var context = CreateHttpContext();
         
         if (remoteIp != null)

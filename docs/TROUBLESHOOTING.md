@@ -54,10 +54,10 @@ This guide covers common issues and their solutions when using AspNetDebugDashbo
 
 1. **Register Interceptor:**
    ```csharp
-   builder.Services.AddDbContext<YourDbContext>(options =>
+   builder.Services.AddDbContext<YourDbContext>((sp, options) =>
    {
        options.UseSqlServer(connectionString);
-       options.AddDebugDashboard(builder.Services.BuildServiceProvider());
+       options.AddDebugDashboard(sp);
    });
    ```
 
