@@ -1,365 +1,96 @@
-# Troubleshooting Guide
+# Troubleshooting
 
-This guide covers common issues and their solutions when using AspNetDebugDashboard.
+## Dashboard returns 404 at /_debug
 
-## Common Issues
+Work through these in order:
 
-### Dashboard Not Accessible
+1. Both registration calls are present:
 
-#### Problem: Cannot access `/_debug` endpoint
-
-**Possible Causes:**
-1. Middleware not registered
-2. Not running in development environment
-3. Dashboard disabled in configuration
-4. Port conflicts
-
-**Solutions:**
-
-1. **Check Middleware Registration:**
    ```csharp
-   // Ensure this is called
-   app.UseDebugDashboard();
+   builder.Services.AddDebugDashboard();   // services
+   app.UseDebugDashboard();                // middleware
    ```
 
-2. **Environment Check:**
+2. You're running in the **Development** environment. Outside it, `UseDebugDashboard()` does nothing by design. To verify that's the cause:
+
    ```csharp
-   // Force enable for testing
    app.UseDebugDashboard(forceEnable: true);
    ```
 
-3. **Configuration Check:**
+3. Controllers are mapped — the dashboard and its API are controllers, so the app needs `app.MapControllers()` (and `AddDebugDashboard` must run before `Build()`).
+
+4. If you changed `BasePath`, the dashboard is at that path, not `/_debug`.
+
+## SQL queries aren't captured
+
+1. The interceptor must be attached to your DbContext:
+
    ```csharp
-   builder.Services.AddDebugDashboard(config =>
-   {
-       config.IsEnabled = true; // Ensure this is true
-   });
-   ```
-
-4. **Port Conflicts:**
-   - Check if another service is using the same port
-   - Try a different port: `dotnet run --urls="https://localhost:5002"`
-
-### SQL Queries Not Appearing
-
-#### Problem: EF Core queries not being captured
-
-**Possible Causes:**
-1. Interceptor not registered
-2. DbContext not configured correctly
-3. SQL logging disabled
-4. Using raw SQL queries
-
-**Solutions:**
-
-1. **Register Interceptor:**
-   ```csharp
-   builder.Services.AddDbContext<YourDbContext>((sp, options) =>
+   builder.Services.AddDbContext<AppDbContext>((sp, options) =>
    {
        options.UseSqlServer(connectionString);
        options.AddDebugDashboard(sp);
    });
    ```
 
-2. **Alternative Registration:**
-   ```csharp
-   builder.Services.AddDebugDashboardEntityFramework();
-   ```
+   Note the `(sp, options)` overload — the interceptor needs the service provider.
 
-3. **Enable SQL Logging:**
-   ```csharp
-   builder.Services.AddDebugDashboard(config =>
-   {
-       config.LogSqlQueries = true;
-   });
-   ```
+2. **`UseInMemoryDatabase` produces no SQL.** The EF in-memory provider doesn't go through the relational command pipeline, so there's nothing to intercept. Use SQLite (`UseSqlite("Data Source=dev.db")`) if you want captured queries during local development.
 
-4. **Check EF Core Version:**
-   - Ensure you're using EF Core 7.0+
-   - Update packages if necessary
+3. `LogSqlQueries` must be true (it is by default).
 
-### High Memory Usage
+4. Raw ADO.NET (`SqlCommand` used directly) bypasses EF and isn't captured. Only commands that flow through EF Core's interceptor pipeline are.
 
-#### Problem: Application consuming too much memory
+## Logs don't appear
 
-**Possible Causes:**
-1. Too many entries stored
-2. Large request/response bodies
-3. Cleanup service not running
-4. Memory leaks in storage
+Only entries written through this package's logger are captured — `IDebugLogger` (injected) or the static `DebugLogger`. Output from `ILogger<T>` / Serilog / NLog is **not** picked up; that's a different pipeline.
 
-**Solutions:**
+## Queries/logs aren't attached to their request
 
-1. **Reduce Max Entries:**
-   ```csharp
-   builder.Services.AddDebugDashboard(config =>
-   {
-       config.MaxEntries = 500; // Reduce from default 1000
-   });
-   ```
+Entries are correlated by `HttpContext.TraceIdentifier` while the request is in flight. Work done outside a request (background services, startup seeding, hosted jobs) is still captured, but lands unattached — you'll see it in the Queries/Logs tabs with no parent request link.
 
-2. **Disable Body Logging:**
-   ```csharp
-   builder.Services.AddDebugDashboard(config =>
-   {
-       config.LogRequestBodies = false;
-       config.LogResponseBodies = false;
-   });
-   ```
+## The database file is corrupt or won't open
 
-3. **Limit Body Size:**
-   ```csharp
-   builder.Services.AddDebugDashboard(config =>
-   {
-       config.MaxBodySize = 10 * 1024; // 10KB instead of 1MB
-   });
-   ```
+LiteDB writes a WAL file next to the database: `debug-dashboard-log.db`. Two rules:
 
-4. **Manual Cleanup:**
-   ```csharp
-   // Call cleanup API endpoint
-   POST /_debug/api/cleanup
-   ```
+- If you delete the database manually, **delete both files**. Deleting only `debug-dashboard.db` and leaving the `-log.db` behind corrupts the store on next startup ("page type must be collection page").
+- Don't run two app instances against the same database path. Give each a distinct `DatabasePath`, or accept that the second instance fails to open the file.
 
-### Performance Issues
+When in doubt: stop the app, delete `debug-dashboard.db` *and* `debug-dashboard-log.db`, start again. It's dev data; it's disposable.
 
-#### Problem: Application running slowly
-
-**Possible Causes:**
-1. Too much data being logged
-2. Synchronous operations blocking
-3. Database performance issues
-4. Large SQL queries being logged
-
-**Solutions:**
-
-1. **Exclude Heavy Endpoints:**
-   ```csharp
-   builder.Services.AddDebugDashboard(config =>
-   {
-       config.ExcludedPaths = new List<string>
-       {
-           "/_debug",
-           "/api/heavy-operation",
-           "/api/file-upload"
-       };
-   });
-   ```
-
-2. **Optimize Database Path:**
-   ```csharp
-   builder.Services.AddDebugDashboard(config =>
-   {
-       config.DatabasePath = "debug-dashboard.db"; // Use faster storage
-   });
-   ```
-
-3. **Reduce Logging:**
-   ```csharp
-   builder.Services.AddDebugDashboard(config =>
-   {
-       config.LogSqlQueries = false; // Disable if not needed
-   });
-   ```
-
-### Build Errors
-
-#### Problem: Compilation errors when using the package
-
-**Common Errors:**
-
-1. **Missing Dependencies:**
-   ```
-   Error: Package 'LiteDB' is not found
-   ```
-   **Solution:** Update to latest package version
-
-2. **Target Framework Issues:**
-   ```
-   Error: Package 'AspNetDebugDashboard' is not compatible with net6.0
-   ```
-   **Solution:** Upgrade to .NET 7.0+
-
-3. **Namespace Conflicts:**
-   ```
-   Error: The type 'DebugLogger' exists in both...
-   ```
-   **Solution:** Use fully qualified names
-
-### Runtime Errors
-
-#### Problem: Exceptions during application startup
-
-**Common Errors:**
-
-1. **Service Registration Error:**
-   ```
-   InvalidOperationException: Unable to resolve service for type 'IDebugStorage'
-   ```
-   **Solution:**
-   ```csharp
-   builder.Services.AddDebugDashboard(); // Ensure this is called
-   ```
-
-2. **Database Access Error:**
-   ```
-   UnauthorizedAccessException: Access to the path 'debug-dashboard.db' is denied
-   ```
-   **Solution:**
-   ```csharp
-   builder.Services.AddDebugDashboard(config =>
-   {
-       config.DatabasePath = Path.Combine(Path.GetTempPath(), "debug-dashboard.db");
-   });
-   ```
-
-3. **Middleware Order Error:**
-   ```
-   InvalidOperationException: The middleware order is incorrect
-   ```
-   **Solution:**
-   ```csharp
-   // Ensure correct order
-   app.UseDebugDashboard(); // Should be early in pipeline
-   app.UseRouting();
-   app.UseAuthorization();
-   app.MapControllers();
-   ```
-
-### Browser Issues
-
-#### Problem: Dashboard not loading in browser
-
-**Possible Causes:**
-1. JavaScript disabled
-2. HTTPS certificate issues
-3. Browser cache issues
-4. CORS problems
-
-**Solutions:**
-
-1. **Enable JavaScript:**
-   - Ensure JavaScript is enabled in your browser
-   - Check browser console for errors
-
-2. **HTTPS Certificate:**
-   ```bash
-   dotnet dev-certs https --trust
-   ```
-
-3. **Clear Browser Cache:**
-   - Hard refresh: Ctrl+F5 (Windows) or Cmd+Shift+R (Mac)
-   - Clear browser cache and cookies
-
-4. **Check Network Tab:**
-   - Open browser dev tools
-   - Check Network tab for failed requests
-   - Look for 404 or 500 errors
-
-## Debugging Steps
-
-### 1. Enable Detailed Logging
-
-```json
-{
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "AspNetDebugDashboard": "Debug"
-    }
-  }
-}
-```
-
-### 2. Check Configuration
+## Memory or disk usage grows too much
 
 ```csharp
-// Add this to see current configuration
-app.MapGet("/debug-config", (IOptions<DebugConfiguration> config) => 
+builder.Services.AddDebugDashboard(config =>
 {
-    return Results.Ok(config.Value);
+    config.MaxEntries = 500;            // per entry type, oldest trimmed first
+    config.LogRequestBodies = false;    // bodies are the heavy part
+    config.LogResponseBodies = false;
+    config.MaxBodySize = 64 * 1024;     // cap captured body size
+    config.RetentionPeriod = TimeSpan.FromDays(1);
 });
 ```
 
-### 3. Verify Services Registration
+You can also trigger a trim manually (`POST /_debug/api/cleanup`) or wipe everything (`DELETE /_debug/api/clear`, or the Clear button in the dashboard).
+
+## Noisy endpoints flood the capture
+
+Exclude them:
 
 ```csharp
-// Check if services are registered
-app.MapGet("/debug-services", (IServiceProvider services) => 
-{
-    var storage = services.GetService<IDebugStorage>();
-    var logger = services.GetService<IDebugLogger>();
-    
-    return Results.Ok(new 
-    {
-        StorageRegistered = storage != null,
-        LoggerRegistered = logger != null
-    });
-});
+config.ExcludedPaths = new() { "/_debug", "/health", "/metrics", "/api/file-upload" };
 ```
 
-### 4. Test API Endpoints
+Matching is contains-based on the path.
 
-```bash
-# Test if API is accessible
-curl https://localhost:5001/_debug/api/stats
+## Version requirements
 
-# Test configuration endpoint
-curl https://localhost:5001/_debug/api/config
-```
+- .NET 8, 9, or 10
+- EF Core 8+ (matching your target framework) for query capture
+- The 2.x dashboard requires no external resources — if the page loads blank, check the browser console and open an issue with what you see
 
-## Getting Help
+## Still stuck
 
-If you're still experiencing issues:
+Open an issue: https://github.com/eladser/AspNetDebugDashboard/issues
 
-1. **Check Existing Issues:** Search [GitHub issues](https://github.com/eladser/AspNetDebugDashboard/issues)
-2. **Create New Issue:** Use the bug report template
-3. **Provide Details:** Include:
-   - .NET version
-   - Package version
-   - Operating system
-   - Browser version
-   - Minimal reproduction code
-   - Error messages and stack traces
-
-## Diagnostic Information
-
-When reporting issues, please include:
-
-```csharp
-// Add this endpoint to collect diagnostic info
-app.MapGet("/debug-diagnostics", (IServiceProvider services) => 
-{
-    var config = services.GetRequiredService<IOptions<DebugConfiguration>>().Value;
-    var env = services.GetRequiredService<IWebHostEnvironment>();
-    
-    return Results.Ok(new 
-    {
-        Environment = env.EnvironmentName,
-        Configuration = config,
-        DotNetVersion = Environment.Version.ToString(),
-        OS = Environment.OSVersion.ToString(),
-        MachineName = Environment.MachineName,
-        CurrentDirectory = Environment.CurrentDirectory
-    });
-});
-```
-
-## Performance Monitoring
-
-To monitor the dashboard's performance impact:
-
-```csharp
-// Add performance monitoring
-app.Use(async (context, next) =>
-{
-    var sw = System.Diagnostics.Stopwatch.StartNew();
-    await next();
-    sw.Stop();
-    
-    if (sw.ElapsedMilliseconds > 100) // Log slow requests
-    {
-        Console.WriteLine($"Slow request: {context.Request.Path} took {sw.ElapsedMilliseconds}ms");
-    }
-});
-```
+Include the package version, .NET version, what you expected vs. what happened, and a minimal repro if you can. `GET /_debug/api/health` output is useful too — it shows the active configuration and storage state.

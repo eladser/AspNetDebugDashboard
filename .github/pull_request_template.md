@@ -1,40 +1,13 @@
-## Description
+## What
 
-Brief description of the changes in this PR.
-
-## Type of Change
-
-- [ ] Bug fix (non-breaking change which fixes an issue)
-- [ ] New feature (non-breaking change which adds functionality)
-- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
-- [ ] Documentation update
-- [ ] Performance improvement
-- [ ] Code refactoring
-
-## Testing
-
-- [ ] I have added tests that prove my fix is effective or that my feature works
-- [ ] New and existing unit tests pass locally with my changes
-- [ ] I have tested this change manually
+What does this PR change, and why?
 
 ## Checklist
 
-- [ ] My code follows the project's coding standards
-- [ ] I have performed a self-review of my own code
-- [ ] I have commented my code, particularly in hard-to-understand areas
-- [ ] I have made corresponding changes to the documentation
-- [ ] My changes generate no new warnings
-- [ ] I have added tests that prove my fix is effective or that my feature works
-- [ ] New and existing unit tests pass locally with my changes
+- [ ] `dotnet test` passes
+- [ ] If `dashboard/` changed: ran `npm run build` and committed the regenerated `wwwroot/index.html`
+- [ ] CHANGELOG.md updated if the change is user-visible
 
-## Screenshots (if applicable)
+## Screenshots
 
-Add screenshots to help explain your changes.
-
-## Breaking Changes
-
-Describe any breaking changes and migration steps if applicable.
-
-## Additional Notes
-
-Any additional information or context about the PR.
+For UI changes, before/after screenshots help a lot.
