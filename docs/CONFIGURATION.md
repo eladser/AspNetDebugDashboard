@@ -77,7 +77,7 @@ builder.Services.AddDebugDashboard();
 | `LogResponseBodies` | `bool` | `false` | Capture HTTP response bodies |
 | `LogSqlQueries` | `bool` | `true` | Log Entity Framework queries |
 | `LogExceptions` | `bool` | `true` | Log unhandled exceptions |
-| `EnableDetailedSqlLogging` | `bool` | `true` | Include SQL parameters and execution plans |
+| `EnableDetailedSqlLogging` | `bool` | `true` | Include SQL parameter values in captured queries |
 | `EnableStackTraceCapture` | `bool` | `true` | Capture stack traces for exceptions |
 | `MaxStackTraceDepth` | `int` | `50` | Maximum stack trace depth |
 
@@ -187,39 +187,6 @@ builder.Services.AddDebugDashboard(config =>
     config.LogRequestBodies = false;
     config.LogResponseBodies = false;
 });
-```
-
-### Custom Security Rules
-
-```csharp
-public class SecurityAwareDebugConfiguration : DebugConfiguration
-{
-    public SecurityAwareDebugConfiguration()
-    {
-        // Apply security-first defaults
-        LogRequestBodies = false;
-        LogResponseBodies = false;
-        AllowDataExport = false;
-        AllowDataImport = false;
-        
-        // Enhanced exclusions
-        ExcludedHeaders.AddRange(new[]
-        {
-            "X-Forwarded-For",
-            "X-Real-IP",
-            "X-User-ID",
-            "X-Session-ID"
-        });
-        
-        ExcludedPaths.AddRange(new[]
-        {
-            "/api/admin",
-            "/api/internal",
-            "/health",
-            "/metrics"
-        });
-    }
-}
 ```
 
 ## Performance Optimization
@@ -340,72 +307,8 @@ if (enableDashboard)
 }
 ```
 
-## Validation and Testing
+## Checking the active configuration
 
-### Configuration Validation
+`GET /_debug/api/config` returns the configuration the dashboard is actually running with — useful when appsettings binding and code configuration disagree.
 
-```csharp
-public static class DebugConfigurationValidator
-{
-    public static void Validate(DebugConfiguration config)
-    {
-        if (config.MaxEntries <= 0)
-            throw new ArgumentException("MaxEntries must be greater than 0");
-        
-        if (config.MaxBodySize <= 0)
-            throw new ArgumentException("MaxBodySize must be greater than 0");
-        
-        if (string.IsNullOrEmpty(config.DatabasePath))
-            throw new ArgumentException("DatabasePath cannot be null or empty");
-        
-        if (config.SlowQueryThresholdMs <= 0)
-            throw new ArgumentException("SlowQueryThresholdMs must be greater than 0");
-    }
-}
-```
-
-### Testing Configuration
-
-```csharp
-[Test]
-public void Configuration_Should_Be_Valid()
-{
-    var config = new DebugConfiguration();
-    
-    // Test default values
-    Assert.IsTrue(config.IsEnabled);
-    Assert.AreEqual(1000, config.MaxEntries);
-    Assert.AreEqual("/_debug", config.BasePath);
-    
-    // Test validation
-    Assert.DoesNotThrow(() => DebugConfigurationValidator.Validate(config));
-}
-```
-
-## Best Practices
-
-1. **Security First**: Always review exclusion lists for sensitive data
-2. **Performance**: Monitor the impact on application performance
-3. **Storage**: Consider disk space usage for the database
-4. **Environment**: Use different configurations per environment
-5. **Retention**: Set appropriate retention periods
-6. **Monitoring**: Monitor dashboard usage and performance impact
-
-## Troubleshooting Configuration
-
-### Common Issues
-
-1. **Dashboard Not Loading**: Check `IsEnabled` and environment settings
-2. **No SQL Queries**: Verify EF Core interceptor configuration
-3. **High Memory Usage**: Reduce `MaxEntries` and disable body logging
-4. **Performance Issues**: Increase exclusion lists and reduce logging detail
-
-### Debug Configuration
-
-```csharp
-// Add this endpoint to debug configuration
-app.MapGet("/debug-config", (IOptions<DebugConfiguration> options) => 
-{
-    return Results.Ok(options.Value);
-});
-```
+If something doesn't behave the way the options suggest, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).

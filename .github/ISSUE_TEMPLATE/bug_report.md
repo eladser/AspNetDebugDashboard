@@ -24,9 +24,9 @@ A clear and concise description of what you expected to happen.
 If applicable, add screenshots to help explain your problem.
 
 **Environment (please complete the following information):**
- - OS: [e.g. Windows 11, Ubuntu 20.04]
- - .NET Version: [e.g. 7.0.0]
- - AspNetDebugDashboard Version: [e.g. 1.0.0]
+ - OS: [e.g. Windows 11, Ubuntu 24.04]
+ - .NET Version: [e.g. 8.0, 9.0, 10.0]
+ - AspNetDebugDashboard Version: [e.g. 2.0.0]
  - Browser: [e.g. Chrome, Firefox]
 
 **Additional context**

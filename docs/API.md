@@ -74,12 +74,15 @@ Returns a paginated list of HTTP requests.
 **Query Parameters:**
 - `page` (int): Page number (default: 1)
 - `pageSize` (int): Items per page (default: 50)
+- `search` (string): Match against path and URL (contains)
 - `method` (string): Filter by HTTP method
 - `path` (string): Filter by path (contains)
 - `statusCode` (int): Filter by status code
-- `fromDate` (datetime): Filter from date
-- `toDate` (datetime): Filter to date
-- `sortBy` (string): Sort field (default: "timestamp")
+- `isSuccessful` (bool): `false` returns only 4xx/5xx, `true` only sub-400
+- `minExecutionTime` (int): Only requests at or above this duration in ms
+- `requestId` (string): Exact match on the trace identifier
+- `dateFrom` / `dateTo` (datetime): Time range
+- `sortBy` (string): `timestamp`, `executiontimems`, `statuscode`, `method`, `path` (default: `timestamp`)
 - `sortDescending` (bool): Sort direction (default: true)
 
 **Response:**
@@ -175,9 +178,11 @@ Returns a paginated list of SQL queries.
 - `page` (int): Page number (default: 1)
 - `pageSize` (int): Items per page (default: 50)
 - `search` (string): Search in query text
-- `fromDate` (datetime): Filter from date
-- `toDate` (datetime): Filter to date
-- `sortBy` (string): Sort field (default: "timestamp")
+- `isSlowQuery` (bool): Only queries flagged slow (over `SlowQueryThresholdMs`)
+- `isSuccessful` (bool): Filter by success/failure
+- `requestId` (string): Exact match on the trace identifier
+- `dateFrom` / `dateTo` (datetime): Time range
+- `sortBy` (string): `timestamp` or `executiontimems` (default: `timestamp`)
 - `sortDescending` (bool): Sort direction (default: true)
 
 **Response:**
@@ -443,6 +448,8 @@ public static class DebugLogger
 
 ### IDebugStorage Interface
 
+To swap LiteDB for your own storage, implement `IDebugStorage` and register it before `AddDebugDashboard()`. The full interface (from `Core/Services/IDebugStorage.cs`):
+
 ```csharp
 public interface IDebugStorage : IDisposable
 {
@@ -450,42 +457,37 @@ public interface IDebugStorage : IDisposable
     Task<string> StoreSqlQueryAsync(SqlQueryEntry query);
     Task<string> StoreLogAsync(LogEntry log);
     Task<string> StoreExceptionAsync(ExceptionEntry exception);
-    
+
     Task<PagedResult<RequestEntry>> GetRequestsAsync(DebugFilter filter);
     Task<PagedResult<SqlQueryEntry>> GetSqlQueriesAsync(DebugFilter filter);
     Task<PagedResult<LogEntry>> GetLogsAsync(DebugFilter filter);
     Task<PagedResult<ExceptionEntry>> GetExceptionsAsync(DebugFilter filter);
-    
+
     Task<RequestEntry?> GetRequestAsync(string id);
     Task<SqlQueryEntry?> GetSqlQueryAsync(string id);
     Task<LogEntry?> GetLogAsync(string id);
     Task<ExceptionEntry?> GetExceptionAsync(string id);
-    
+
     Task<DebugStats> GetStatsAsync();
     Task CleanupAsync(int maxEntries);
     Task ClearAllAsync();
+
+    Task<object> GetHealthAsync();
+    Task<object> ExportAllAsync();
+    Task ImportAsync(object data);
+    Task<IEnumerable<object>> SearchAsync(string term, string[] types, int maxResults = 50);
+    Task<object> GetPerformanceMetricsAsync(TimeSpan? timeWindow = null);
+    Task<int> BulkDeleteAsync(string[] ids, string type);
+    Task<int> DeleteOlderThanAsync(DateTime cutoff);
+    Task OptimizeAsync();
+    Task<long> GetDatabaseSizeAsync();
+    Task<int> GetTotalEntriesAsync();
 }
 ```
 
-### Configuration Classes
+### Configuration
 
-```csharp
-public class DebugConfiguration
-{
-    public bool IsEnabled { get; set; } = true;
-    public string DatabasePath { get; set; } = "debug-dashboard.db";
-    public string BasePath { get; set; } = "/_debug";
-    public int MaxEntries { get; set; } = 1000;
-    public bool LogRequestBodies { get; set; } = true;
-    public bool LogResponseBodies { get; set; } = false;
-    public bool LogSqlQueries { get; set; } = true;
-    public bool LogExceptions { get; set; } = true;
-    public bool EnableRealTimeUpdates { get; set; } = true;
-    public List<string> ExcludedPaths { get; set; } = new();
-    public List<string> ExcludedHeaders { get; set; } = new();
-    public int MaxBodySize { get; set; } = 1024 * 1024; // 1MB
-}
-```
+All configuration options and their defaults are documented in [CONFIGURATION.md](CONFIGURATION.md).
 
 ## Usage Examples
 
