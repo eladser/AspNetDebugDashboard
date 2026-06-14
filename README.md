@@ -165,6 +165,9 @@ The spans carry the request id, status, SQL text, and timing. They cost nothing 
 
 ## MCP server for AI agents
 
+[![NuGet](https://img.shields.io/nuget/v/AspNetDebugDashboard.Mcp.svg?label=AspNetDebugDashboard.Mcp)](https://www.nuget.org/packages/AspNetDebugDashboard.Mcp/)
+[![Downloads](https://img.shields.io/nuget/dt/AspNetDebugDashboard.Mcp.svg)](https://www.nuget.org/packages/AspNetDebugDashboard.Mcp/)
+
 `AspNetDebugDashboard.Mcp` is a separate dotnet tool that exposes the captured data to a coding agent over MCP, so it can read recent requests, the SQL a request ran, recent failures, and performance numbers while it works on your app.
 
 ```bash
