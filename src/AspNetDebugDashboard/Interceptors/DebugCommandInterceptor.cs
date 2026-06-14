@@ -92,7 +92,7 @@ public class DebugCommandInterceptor : DbCommandInterceptor
         await StoreAsync(entry);
     }
 
-    // Snapshot everything we need from the DbCommand synchronously — it may be
+    // Snapshot everything we need from the DbCommand synchronously, since it may be
     // disposed or reused by the time a background store task runs.
     private SqlQueryEntry? BuildEntry(DbCommand command, TimeSpan duration, bool success, string? error, int? rowsAffected)
     {
@@ -129,6 +129,11 @@ public class DebugCommandInterceptor : DbCommandInterceptor
             if (!string.IsNullOrEmpty(entry.RequestId))
             {
                 _serviceProvider.GetService<DebugContext>()?.AddSqlQuery(entry.RequestId, entry);
+            }
+
+            if (_serviceProvider.GetService<IOptions<DebugConfiguration>>()?.Value.EmitActivities == true)
+            {
+                DebugTelemetry.RecordQuery(entry);
             }
         }
         catch

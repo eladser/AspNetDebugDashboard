@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>aspnet-debug-mcp</ToolCommandName>
+    <PackageId>AspNetDebugDashboard.Mcp</PackageId>
+    <Version>2.1.0</Version>
+    <Authors>Elad Sertshuk</Authors>
+    <Description>MCP server for AspNetDebugDashboard. Lets coding agents query captured requests, SQL queries, logs, exceptions, and performance from a running dashboard over its REST API.</Description>
+    <PackageProjectUrl>https://github.com/eladser/AspNetDebugDashboard</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageTags>mcp;model-context-protocol;aspnetcore;debugging;ai;agent;dotnet</PackageTags>
+    <RepositoryUrl>https://github.com/eladser/AspNetDebugDashboard</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol" Version="1.4.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="..\AspNetDebugDashboard\icon.png" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

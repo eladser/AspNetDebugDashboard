@@ -30,4 +30,10 @@ public class DebugConfiguration
     // Missing properties referenced in the code
     public TimeSpan? CleanupInterval { get; set; } = TimeSpan.FromHours(1);
     public long MaxDatabaseSize { get; set; } = 100 * 1024 * 1024; // 100MB
+
+    // Emit captured requests and queries as Activity spans on the
+    // "AspNetDebugDashboard" ActivitySource. No effect unless something is
+    // listening, so you add that source to your OpenTelemetry tracing to
+    // forward them (Aspire, Jaeger, any OTLP backend).
+    public bool EmitActivities { get; set; } = true;
 }

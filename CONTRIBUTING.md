@@ -41,6 +41,7 @@ cd dashboard && npm run dev   # proxies /_debug/api to :5000
 
 ```
 src/AspNetDebugDashboard/   the package: middleware, interceptor, storage, API controllers
+src/AspNetDebugDashboard.Mcp/  MCP server (dotnet tool) over the REST API
 dashboard/                  dashboard UI source (Vite + React + TS)
 samples/SampleApp/          test bed with traffic-generating endpoints
 tests/                      xUnit suite, runs on net8.0 and net10.0

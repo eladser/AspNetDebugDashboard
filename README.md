@@ -34,7 +34,7 @@ Or from the Package Manager Console in Visual Studio:
 Install-Package AspNetDebugDashboard
 ```
 
-Works on .NET 8, 9, and 10. No other setup files, schemas, or services needed — storage is an embedded LiteDB database created on first run.
+Works on .NET 8, 9, and 10. No other setup files, schemas, or services needed. Storage is an embedded LiteDB database created on first run.
 
 ## Setup
 
@@ -69,7 +69,7 @@ builder.Services.AddDbContext<AppDbContext>((sp, options) =>
 });
 ```
 
-Works with SQL Server, PostgreSQL, SQLite, MySQL — anything that goes through EF Core's relational pipeline. (`UseInMemoryDatabase` produces no SQL, so there's nothing to capture there.)
+Works with SQL Server, PostgreSQL, SQLite, MySQL, anything that goes through EF Core's relational pipeline. (`UseInMemoryDatabase` produces no SQL, so there's nothing to capture there.)
 
 ### Write your own log entries
 
@@ -99,7 +99,7 @@ Entries written during a request are attached to it, so the request detail shows
 | | |
 |---|---|
 | **Overview** | totals, error rate, status/method distribution, slowest requests and queries |
-| **Performance** | req/min, avg, median, P95/P99, error rate, slowest endpoints — last hour |
+| **Performance** | req/min, avg, median, P95/P99, error rate, slowest endpoints (last hour) |
 | **Requests** | sortable table with duration bars; detail has Summary / Headers / Request / Response / SQL / Logs tabs and a **copy-as-cURL** button |
 | **Queries** | full SQL with syntax highlighting, parameters, timing; slow queries flagged; an **N+1 warning** appears when one request runs the same query 3+ times |
 | **Logs** | level, category, structured properties, stack traces |
@@ -152,6 +152,40 @@ builder.Services.AddDebugDashboard();
 
 The full reference is in [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 
+## OpenTelemetry
+
+Captured requests and queries are also emitted as spans on an `ActivitySource` named `AspNetDebugDashboard`. Add that source to your tracer and they flow to Aspire, Jaeger, or any OTLP backend, alongside what the dashboard stores locally:
+
+```csharp
+builder.Services.AddOpenTelemetry()
+    .WithTracing(t => t
+        .AddSource("AspNetDebugDashboard")
+        .AddOtlpExporter());
+```
+
+The spans carry the request id, status, SQL text, and timing. They cost nothing until you add the source (no listener, no span), so the default is fine to leave on. Set `EmitActivities = false` to turn it off entirely. Details in [docs/OPENTELEMETRY.md](docs/OPENTELEMETRY.md).
+
+## MCP server for AI agents
+
+`AspNetDebugDashboard.Mcp` is a separate dotnet tool that exposes the captured data to a coding agent over MCP, so it can read recent requests, the SQL a request ran, recent failures, and performance numbers while it works on your app.
+
+```bash
+dotnet tool install --global AspNetDebugDashboard.Mcp
+```
+
+```json
+{
+  "mcpServers": {
+    "debug-dashboard": {
+      "command": "aspnet-debug-mcp",
+      "env": { "DEBUG_DASHBOARD_URL": "http://localhost:5000" }
+    }
+  }
+}
+```
+
+Setup and the full tool list are in its [README](src/AspNetDebugDashboard.Mcp/README.md).
+
 ## Production
 
 `UseDebugDashboard()` does nothing unless the environment is Development, so leaving the package referenced in production builds is safe. If you do want it on elsewhere (a staging box, say), opt in explicitly:
@@ -169,9 +203,9 @@ The dashboard is a client of a plain JSON API you can also call directly:
 | Endpoint | What it returns |
 |---|---|
 | `GET /_debug/api/stats` | totals and distributions |
-| `GET /_debug/api/requests` | paged requests — supports `search`, `method`, `statusCode`, `isSuccessful`, `minExecutionTime`, `sortBy`, `page` |
-| `GET /_debug/api/queries` | paged SQL queries — supports `search`, `isSlowQuery`, `isSuccessful` |
-| `GET /_debug/api/logs` | paged logs — supports `search`, `level` |
+| `GET /_debug/api/requests` | paged requests; supports `search`, `method`, `statusCode`, `isSuccessful`, `minExecutionTime`, `sortBy`, `page` |
+| `GET /_debug/api/queries` | paged SQL queries; supports `search`, `isSlowQuery`, `isSuccessful` |
+| `GET /_debug/api/logs` | paged logs; supports `search`, `level` |
 | `GET /_debug/api/exceptions` | paged exceptions |
 | `GET /_debug/api/performance` | last-hour metrics (P95/P99, error rate, slowest endpoints) |
 | `GET /_debug/api/search?term=` | cross-type search |
@@ -202,7 +236,7 @@ The UI is a Vite + React app in [dashboard/](dashboard/), compiled to one HTML f
 ```bash
 cd dashboard
 npm install
-npm run dev    # proxies /_debug/api to localhost:5000 — run the sample app alongside
+npm run dev    # proxies /_debug/api to localhost:5000 (run the sample app alongside)
 npm run build  # writes src/AspNetDebugDashboard/wwwroot/index.html
 ```
 

@@ -57,10 +57,12 @@ jobs:
 
       - name: Pack
         run: |
-          dotnet pack src/AspNetDebugDashboard -c Release --no-build -o artifacts \
-            -p:PackageVersion=${{ steps.version.outputs.version }} \
-            -p:AssemblyVersion=${{ steps.version.outputs.version }} \
-            -p:FileVersion=${{ steps.version.outputs.version }}
+          for proj in src/AspNetDebugDashboard src/AspNetDebugDashboard.Mcp; do
+            dotnet pack "$proj" -c Release --no-build -o artifacts \
+              -p:PackageVersion=${{ steps.version.outputs.version }} \
+              -p:AssemblyVersion=${{ steps.version.outputs.version }} \
+              -p:FileVersion=${{ steps.version.outputs.version }}
+          done
 
       - name: Push
         run: |

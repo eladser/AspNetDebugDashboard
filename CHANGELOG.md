@@ -2,6 +2,14 @@
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versions follow [SemVer](https://semver.org).
 
+## [2.1.0] - 2026-06-14
+
+Two additive features. Existing setup is unchanged.
+
+### Added
+- OpenTelemetry tracing. Captured requests and queries are emitted as spans on the `AspNetDebugDashboard` ActivitySource. Add that source to your tracer (`AddSource("AspNetDebugDashboard")`) and they flow to Aspire or any OTLP backend, carrying the request id, status, query text, and timing. Off when nothing is listening, so it costs nothing until you wire it up. Controlled by the `EmitActivities` option (default on).
+- `AspNetDebugDashboard.Mcp`, a separate dotnet tool that runs an MCP server over the dashboard's REST API. It gives a coding agent eight read-only tools (recent requests, a request's SQL and logs, recent queries/exceptions/logs, performance, search) against your running app. See its [README](src/AspNetDebugDashboard.Mcp/README.md).
+
 ## [2.0.0] - 2026-06-11
 
 The dashboard UI was rebuilt from scratch and the supported framework range was extended. Routes, API endpoints, and the public extension methods are unchanged, so upgrading from 1.x should not require code changes.

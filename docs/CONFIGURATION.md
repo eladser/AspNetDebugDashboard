@@ -109,6 +109,12 @@ builder.Services.AddDebugDashboard();
 | `EnableRealTimeUpdates` | `bool` | `true` | Enable real-time dashboard updates |
 | `TimeZone` | `string` | `"UTC"` | Time zone for displaying timestamps |
 
+### Telemetry Settings
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `EmitActivities` | `bool` | `true` | Emit captured requests and queries as OpenTelemetry spans on the `AspNetDebugDashboard` source. Does nothing until you add that source to a tracer. See [OPENTELEMETRY.md](OPENTELEMETRY.md). |
+
 ## Environment-Specific Configuration
 
 ### Development Environment
@@ -309,6 +315,6 @@ if (enableDashboard)
 
 ## Checking the active configuration
 
-`GET /_debug/api/config` returns the configuration the dashboard is actually running with — useful when appsettings binding and code configuration disagree.
+`GET /_debug/api/config` returns the configuration the dashboard is actually running with. Useful when appsettings binding and code configuration disagree.
 
 If something doesn't behave the way the options suggest, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).

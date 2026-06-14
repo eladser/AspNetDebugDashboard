@@ -1,4 +1,4 @@
-// Minimal SQL tokenizer for display highlighting. Not a parser — just enough
+// Minimal SQL tokenizer for display highlighting. Not a parser, just enough
 // to make keywords, strings, numbers, and parameters scannable.
 
 const KEYWORDS = new Set([

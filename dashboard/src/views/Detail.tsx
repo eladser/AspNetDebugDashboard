@@ -135,7 +135,7 @@ function RequestDetail({ entry, onOpen }: { entry: RequestEntry; onOpen: (ref: D
         {tab === 'response' && (
           entry.responseBody
             ? <CodeBlock text={prettyBody(entry.responseBody)} />
-            : <div className="state-box"><div>No response body captured — enable <code>LogResponseBodies</code> in config</div></div>
+            : <div className="state-box"><div>No response body captured. Enable <code>LogResponseBodies</code> in config</div></div>
         )}
 
         {tab === 'sql' && (
@@ -143,7 +143,7 @@ function RequestDetail({ entry, onOpen }: { entry: RequestEntry; onOpen: (ref: D
             {nPlusOne && (
               <div className="banner">
                 <div>
-                  <div className="b-title">Possible N+1 — identical query ran {nPlusOne.count}×</div>
+                  <div className="b-title">Possible N+1: identical query ran {nPlusOne.count}×</div>
                   <div className="b-sub">{nPlusOne.query.slice(0, 120)}{nPlusOne.query.length > 120 ? '…' : ''}</div>
                 </div>
               </div>
@@ -203,7 +203,7 @@ function QueryDetail({ entry, onOpen }: { entry: SqlQueryEntry; onOpen: (ref: De
     <div className="detail-body">
       <KV
         rows={[
-          ['Duration', <span className={entry.isSlowQuery ? 'level warning' : undefined}>{fmtDuration(entry.executionTimeMs)}{entry.isSlowQuery ? ' — slow' : ''}</span>],
+          ['Duration', <span className={entry.isSlowQuery ? 'level warning' : undefined}>{fmtDuration(entry.executionTimeMs)}{entry.isSlowQuery ? ' (slow)' : ''}</span>],
           ['Time', fmtDateTime(entry.timestamp)],
           ['Rows affected', entry.rowsAffected > 0 ? entry.rowsAffected : null],
           ['Database', entry.database],
@@ -292,7 +292,7 @@ function ExceptionDetail({ entry, onOpen }: { entry: ExceptionEntry; onOpen: (re
         </Section>
       )}
       {entry.innerException && (
-        <Section title={`Inner exception — ${entry.innerException.exceptionType ?? 'unknown type'}`}>
+        <Section title={`Inner exception: ${entry.innerException.exceptionType ?? 'unknown type'}`}>
           <CodeBlock
             text={entry.innerException.message + (entry.innerException.stackTrace ? `\n\n${entry.innerException.stackTrace}` : '')}
           />
