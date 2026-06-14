@@ -1,5 +1,9 @@
 # AspNetDebugDashboard.Mcp
 
+[![NuGet](https://img.shields.io/nuget/v/AspNetDebugDashboard.Mcp.svg)](https://www.nuget.org/packages/AspNetDebugDashboard.Mcp/)
+[![Downloads](https://img.shields.io/nuget/dt/AspNetDebugDashboard.Mcp.svg)](https://www.nuget.org/packages/AspNetDebugDashboard.Mcp/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/eladser/AspNetDebugDashboard/blob/main/LICENSE)
+
 An MCP server that lets a coding agent (Claude, Copilot, etc.) read the data [AspNetDebugDashboard](https://github.com/eladser/AspNetDebugDashboard) captures from your running app: recent requests, the SQL a request ran, recent failures, slow queries, performance numbers.
 
 It's a thin client over the dashboard's REST API, so your app needs to be running with the dashboard enabled.
