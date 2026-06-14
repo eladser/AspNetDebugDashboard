@@ -2,6 +2,11 @@
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versions follow [SemVer](https://semver.org).
 
+## [2.1.1] - 2026-06-14
+
+### Fixed
+- README images (banner, demo gif, screenshots) didn't render on the NuGet listing because they used relative paths and raw HTML. They now use absolute URLs so the listing shows them.
+
 ## [2.1.0] - 2026-06-14
 
 Two additive features. Existing setup is unchanged.
