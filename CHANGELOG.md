@@ -2,6 +2,11 @@
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- NuGet version and download badges for the `AspNetDebugDashboard.Mcp` package, in the main README and the package's own README. (Already on GitHub; reaches the NuGet listings with the next release.)
+
 ## [2.1.1] - 2026-06-14
 
 ### Fixed
