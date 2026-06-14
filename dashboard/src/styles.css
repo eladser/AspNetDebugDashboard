@@ -1,4 +1,4 @@
-/* Design tokens. Dark only — it's a debug tool that lives next to a terminal.
+/* Design tokens. Dark only, it's a debug tool that lives next to a terminal.
    System fonts on purpose: the dashboard must render with zero network access. */
 :root {
   --bg: #0b0e12;

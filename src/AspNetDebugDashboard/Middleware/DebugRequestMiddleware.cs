@@ -194,6 +194,11 @@ public class DebugRequestMiddleware
 
             await _storage.StoreRequestAsync(requestEntry);
 
+            if (_config.EmitActivities)
+            {
+                DebugTelemetry.RecordRequest(requestEntry);
+            }
+
             // Also log as exception if there was an error
             if (exception != null)
             {

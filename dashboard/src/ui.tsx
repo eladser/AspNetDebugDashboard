@@ -177,7 +177,7 @@ export function FootBar({
   );
 }
 
-// Debounced search input — typing stays snappy, queries fire 300ms after the
+// Debounced search input. Typing stays snappy, queries fire 300ms after the
 // last keystroke. Exposes its input via inputRef for the `/` shortcut.
 export function SearchBox({
   value,

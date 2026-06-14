@@ -17,7 +17,7 @@ Work through these in order:
    app.UseDebugDashboard(forceEnable: true);
    ```
 
-3. Controllers are mapped — the dashboard and its API are controllers, so the app needs `app.MapControllers()` (and `AddDebugDashboard` must run before `Build()`).
+3. Controllers are mapped. The dashboard and its API are controllers, so the app needs `app.MapControllers()` (and `AddDebugDashboard` must run before `Build()`).
 
 4. If you changed `BasePath`, the dashboard is at that path, not `/_debug`.
 
@@ -33,7 +33,7 @@ Work through these in order:
    });
    ```
 
-   Note the `(sp, options)` overload — the interceptor needs the service provider.
+   Note the `(sp, options)` overload: the interceptor needs the service provider.
 
 2. **`UseInMemoryDatabase` produces no SQL.** The EF in-memory provider doesn't go through the relational command pipeline, so there's nothing to intercept. Use SQLite (`UseSqlite("Data Source=dev.db")`) if you want captured queries during local development.
 
@@ -43,11 +43,11 @@ Work through these in order:
 
 ## Logs don't appear
 
-Only entries written through this package's logger are captured — `IDebugLogger` (injected) or the static `DebugLogger`. Output from `ILogger<T>` / Serilog / NLog is **not** picked up; that's a different pipeline.
+Only entries written through this package's logger are captured: `IDebugLogger` (injected) or the static `DebugLogger`. Output from `ILogger<T>` / Serilog / NLog is **not** picked up; that's a different pipeline.
 
 ## Queries/logs aren't attached to their request
 
-Entries are correlated by `HttpContext.TraceIdentifier` while the request is in flight. Work done outside a request (background services, startup seeding, hosted jobs) is still captured, but lands unattached — you'll see it in the Queries/Logs tabs with no parent request link.
+Entries are correlated by `HttpContext.TraceIdentifier` while the request is in flight. Work done outside a request (background services, startup seeding, hosted jobs) is still captured, but lands unattached, so you'll see it in the Queries/Logs tabs with no parent request link.
 
 ## The database file is corrupt or won't open
 
@@ -87,10 +87,10 @@ Matching is contains-based on the path.
 
 - .NET 8, 9, or 10
 - EF Core 8+ (matching your target framework) for query capture
-- The 2.x dashboard requires no external resources — if the page loads blank, check the browser console and open an issue with what you see
+- The 2.x dashboard requires no external resources. If the page loads blank, check the browser console and open an issue with what you see
 
 ## Still stuck
 
 Open an issue: https://github.com/eladser/AspNetDebugDashboard/issues
 
-Include the package version, .NET version, what you expected vs. what happened, and a minimal repro if you can. `GET /_debug/api/health` output is useful too — it shows the active configuration and storage state.
+Include the package version, .NET version, what you expected vs. what happened, and a minimal repro if you can. `GET /_debug/api/health` output is useful too; it shows the active configuration and storage state.
