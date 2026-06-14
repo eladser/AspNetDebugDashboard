@@ -1,6 +1,4 @@
-<p align="center">
-  <img src="docs/images/banner.png" alt="" width="780">
-</p>
+![ASP.NET Debug Dashboard](https://raw.githubusercontent.com/eladser/AspNetDebugDashboard/main/docs/images/banner.png)
 
 # ASP.NET Debug Dashboard
 
@@ -14,7 +12,7 @@ Request, SQL query, log, and exception capture for ASP.NET Core, viewable in a d
 
 Everything is stored locally in a LiteDB file. The dashboard ships inside the package as a single self-contained page, so there are no CDN dependencies and it works offline.
 
-![Demo](docs/images/demo.gif)
+![Demo](https://raw.githubusercontent.com/eladser/AspNetDebugDashboard/main/docs/images/demo.gif)
 
 ## Install
 
@@ -25,7 +23,7 @@ dotnet add package AspNetDebugDashboard
 Or in the project file:
 
 ```xml
-<PackageReference Include="AspNetDebugDashboard" Version="2.0.0" />
+<PackageReference Include="AspNetDebugDashboard" Version="2.1.1" />
 ```
 
 Or from the Package Manager Console in Visual Studio:
@@ -107,11 +105,11 @@ Entries written during a request are attached to it, so the request detail shows
 
 Global search (`Ctrl+K`) covers everything. Tables navigate from the keyboard: `j`/`k` rows, `Enter` open, `/` filter, `Esc` close. Queries, logs, and exceptions link back to their parent request.
 
-![Overview](docs/images/overview.png)
+![Overview](https://raw.githubusercontent.com/eladser/AspNetDebugDashboard/main/docs/images/overview.png)
 
-![Request detail](docs/images/request-detail.png)
+![Request detail](https://raw.githubusercontent.com/eladser/AspNetDebugDashboard/main/docs/images/request-detail.png)
 
-![Query detail](docs/images/query-detail.png)
+![Query detail](https://raw.githubusercontent.com/eladser/AspNetDebugDashboard/main/docs/images/query-detail.png)
 
 ## Configuration
 

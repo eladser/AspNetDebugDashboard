@@ -6,9 +6,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <PackageId>AspNetDebugDashboard</PackageId>
     <Title>ASP.NET Debug Dashboard</Title>
-    <Version>2.1.0</Version>
-    <AssemblyVersion>2.1.0</AssemblyVersion>
-    <FileVersion>2.1.0</FileVersion>
+    <Version>2.1.1</Version>
+    <AssemblyVersion>2.1.1</AssemblyVersion>
+    <FileVersion>2.1.1</FileVersion>
     <Authors>Elad Sertshuk</Authors>
     <Description>Request, SQL query, log, and exception capture for ASP.NET Core, viewable in a dashboard served at /_debug. Inspired by Laravel Telescope. LiteDB storage, EF Core interceptor, zero-config setup.</Description>
     <PackageProjectUrl>https://github.com/eladser/AspNetDebugDashboard</PackageProjectUrl>
@@ -18,7 +18,7 @@
     <PackageTags>aspnetcore;debugging;dashboard;telescope;logging;monitoring;efcore;middleware;developer-tools</PackageTags>
     <RepositoryUrl>https://github.com/eladser/AspNetDebugDashboard</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageReleaseNotes>2.1.0 adds OpenTelemetry tracing: captured requests and queries are emitted as spans on the "AspNetDebugDashboard" ActivitySource, so adding that source to your tracer forwards them to Aspire or any OTLP backend. There's also a new companion MCP server (AspNetDebugDashboard.Mcp) that lets coding agents query the captured data. Nothing in the existing setup changes.</PackageReleaseNotes>
+    <PackageReleaseNotes>2.1.1 fixes the README images not rendering on the NuGet listing (now absolute URLs). 2.1.0 added OpenTelemetry tracing on the "AspNetDebugDashboard" ActivitySource and a companion MCP server (AspNetDebugDashboard.Mcp) for coding agents.</PackageReleaseNotes>
     <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest</AnalysisLevel>
