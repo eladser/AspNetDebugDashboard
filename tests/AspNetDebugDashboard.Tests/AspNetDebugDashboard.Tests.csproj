@@ -45,6 +45,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\AspNetDebugDashboard\AspNetDebugDashboard.csproj" />
+    <ProjectReference Include="..\..\src\AspNetDebugDashboard.Mcp\AspNetDebugDashboard.Mcp.csproj" />
   </ItemGroup>
 
 </Project>
