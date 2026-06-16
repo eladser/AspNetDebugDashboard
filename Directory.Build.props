@@ -1,0 +1,18 @@
+<Project>
+
+  <!-- Shared identity + build settings for every package in the suite.
+       Project-specific bits (PackageId, Description, TargetFrameworks, Version)
+       stay in each .csproj. -->
+  <PropertyGroup>
+    <Authors>Elad Sertshuk</Authors>
+    <Company>Elad Sertshuk</Company>
+    <PackageProjectUrl>https://github.com/eladser/AspNetDebugDashboard</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/eladser/AspNetDebugDashboard</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+</Project>

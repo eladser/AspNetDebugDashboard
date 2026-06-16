@@ -1,4 +1,5 @@
 using AspNetDebugDashboard.Extensions;
+using AspNetMailbox;
 using Microsoft.EntityFrameworkCore;
 using SampleApp.Data;
 using SampleApp.Services;
@@ -36,6 +37,9 @@ builder.Services.AddDbContext<SampleDbContext>((sp, options) =>
     options.AddDebugDashboard(sp);
 });
 
+// Mailbox: capture outbound email at /_mailbox (SMTP sink on :2525)
+builder.Services.AddMailbox();
+
 // Add sample services
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
@@ -44,6 +48,7 @@ var app = builder.Build();
 
 // IMPORTANT: Force enable Debug Dashboard regardless of environment
 app.UseDebugDashboard(forceEnable: true);
+app.UseMailbox(forceEnable: true);
 
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
