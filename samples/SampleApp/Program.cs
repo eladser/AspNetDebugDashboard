@@ -1,6 +1,7 @@
 using AspNetDebugDashboard.Extensions;
 using AspNetMailbox;
 using AspNetFlags;
+using AspNetJobs;
 using Microsoft.EntityFrameworkCore;
 using SampleApp.Data;
 using SampleApp.Services;
@@ -45,6 +46,9 @@ builder.Services.AddMailbox(o => o.AlwaysRunSink = true);
 // Feature flags at /_flags
 builder.Services.AddFlags();
 
+// Background jobs at /_jobs
+builder.Services.AddJobs();
+
 // Add sample services
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
@@ -55,6 +59,17 @@ var app = builder.Build();
 app.UseDebugDashboard(forceEnable: true);
 app.UseMailbox(forceEnable: true);
 app.UseFlags(forceEnable: true);
+app.UseJobs(forceEnable: true);
+
+// Enqueue a few demo jobs so /_jobs has something to show.
+{
+    var jobs = app.Services.GetRequiredService<IJobQueue>();
+    jobs.Enqueue("send-welcome-email", async ct => await Task.Delay(120, ct));
+    jobs.Enqueue("rebuild-search-index", async ct => await Task.Delay(900, ct));
+    jobs.Enqueue("generate-invoice-pdf", async ct => await Task.Delay(300, ct));
+    jobs.Enqueue("sync-inventory", _ => throw new InvalidOperationException("upstream returned 503"));
+    jobs.Enqueue("nightly-report", async ct => await Task.Delay(2500, ct));
+}
 
 // Seed a few flags so the demo has something to toggle (auto-discovered on first check).
 using (var scope = app.Services.CreateScope())
