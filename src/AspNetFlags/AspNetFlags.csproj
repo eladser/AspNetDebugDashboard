@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <PackageId>AspNetFlags</PackageId>
+    <Title>ASP.NET Flags</Title>
+    <Version>0.1.0</Version>
+    <Description>Local feature flags for ASP.NET Core with a live toggle UI at /_flags. Flags are discovered as your code checks them, flipped from the browser, and stored locally. No Azure App Configuration, no SaaS. Part of the AspNetDebugDashboard suite.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageTags>aspnetcore;feature-flags;feature-toggle;developer-tools;pennant</PackageTags>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="LiteDB" Version="5.0.21" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="icon.png" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="wwwroot\**\*" />
+  </ItemGroup>
+
+</Project>

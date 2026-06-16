@@ -1,5 +1,6 @@
 using AspNetDebugDashboard.Extensions;
 using AspNetMailbox;
+using AspNetFlags;
 using Microsoft.EntityFrameworkCore;
 using SampleApp.Data;
 using SampleApp.Services;
@@ -41,6 +42,9 @@ builder.Services.AddDbContext<SampleDbContext>((sp, options) =>
 // AlwaysRunSink so the demo works even though the sample runs as Production.
 builder.Services.AddMailbox(o => o.AlwaysRunSink = true);
 
+// Feature flags at /_flags
+builder.Services.AddFlags();
+
 // Add sample services
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
@@ -50,6 +54,16 @@ var app = builder.Build();
 // IMPORTANT: Force enable Debug Dashboard regardless of environment
 app.UseDebugDashboard(forceEnable: true);
 app.UseMailbox(forceEnable: true);
+app.UseFlags(forceEnable: true);
+
+// Seed a few flags so the demo has something to toggle (auto-discovered on first check).
+using (var scope = app.Services.CreateScope())
+{
+    var ff = scope.ServiceProvider.GetRequiredService<IFeatureFlags>();
+    foreach (var n in new[] { "new-checkout", "dark-mode", "beta-search", "promo-banner" }) ff.IsEnabled(n);
+    ff.Set("dark-mode", true);
+    ff.Set("beta-search", true);
+}
 
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
