@@ -2,6 +2,8 @@ using AspNetDebugDashboard.Extensions;
 using AspNetMailbox;
 using AspNetFlags;
 using AspNetJobs;
+using AspNetVitals;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using SampleApp.Data;
 using SampleApp.Services;
@@ -49,6 +51,14 @@ builder.Services.AddFlags();
 // Background jobs at /_jobs
 builder.Services.AddJobs();
 
+// Vitals at /_vitals (picks up the health checks below automatically)
+builder.Services.AddVitals();
+builder.Services.AddHealthChecks()
+    .AddCheck("self", () => HealthCheckResult.Healthy("running"))
+    .AddCheck("database", () => HealthCheckResult.Healthy("sqlite reachable"))
+    .AddCheck("disk-space", () => HealthCheckResult.Degraded("82% used"))
+    .AddCheck("redis-cache", () => HealthCheckResult.Unhealthy("connection refused"));
+
 // Add sample services
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
@@ -60,6 +70,7 @@ app.UseDebugDashboard(forceEnable: true);
 app.UseMailbox(forceEnable: true);
 app.UseFlags(forceEnable: true);
 app.UseJobs(forceEnable: true);
+app.UseVitals(forceEnable: true);
 
 // Enqueue a few demo jobs so /_jobs has something to show.
 {
