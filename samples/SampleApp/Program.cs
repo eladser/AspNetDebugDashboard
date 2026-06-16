@@ -37,8 +37,9 @@ builder.Services.AddDbContext<SampleDbContext>((sp, options) =>
     options.AddDebugDashboard(sp);
 });
 
-// Mailbox: capture outbound email at /_mailbox (SMTP sink on :2525)
-builder.Services.AddMailbox();
+// Mailbox: capture outbound email at /_mailbox (SMTP sink on :2525).
+// AlwaysRunSink so the demo works even though the sample runs as Production.
+builder.Services.AddMailbox(o => o.AlwaysRunSink = true);
 
 // Add sample services
 builder.Services.AddScoped<IProductService, ProductService>();

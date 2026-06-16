@@ -35,8 +35,13 @@ public class MailboxOptions
 
     public string DatabasePath { get; set; } = "mailbox.db";
     public int MaxMessages { get; set; } = 200;
+    public int MaxMessageSizeBytes { get; set; } = 25 * 1024 * 1024;
 
     // The in-process SMTP sink. Point your sender at localhost:SmtpPort in dev.
     public bool EnableSmtpSink { get; set; } = true;
     public int SmtpPort { get; set; } = 2525;
+
+    // The sink only listens in Development by default, so it never opens a port
+    // in production. Set true to run it everywhere (demos, staging boxes).
+    public bool AlwaysRunSink { get; set; } = false;
 }

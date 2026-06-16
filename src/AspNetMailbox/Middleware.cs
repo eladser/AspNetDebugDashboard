@@ -8,7 +8,7 @@ namespace AspNetMailbox;
 internal sealed class MailboxMiddleware
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
-    private static string? _html;
+    private static volatile string? _html;
     private static readonly object _lock = new();
 
     private readonly RequestDelegate _next;
@@ -25,13 +25,19 @@ internal sealed class MailboxMiddleware
         var path = ctx.Request.Path.Value ?? "";
         var basePath = _options.BasePath;
 
-        if (!path.StartsWith(basePath, StringComparison.OrdinalIgnoreCase))
+        // exact base or a child path only, so /_mailbox-other doesn't match
+        if (!(path.Equals(basePath, StringComparison.OrdinalIgnoreCase)
+              || path.StartsWith(basePath + "/", StringComparison.OrdinalIgnoreCase)))
         {
             await _next(ctx);
             return;
         }
 
         var rest = path.Substring(basePath.Length).TrimEnd('/');
+
+        // captured mail is untrusted; never let a response be sniffed into an
+        // executable type in the dashboard's origin
+        ctx.Response.Headers["X-Content-Type-Options"] = "nosniff";
 
         // page
         if (rest.Length == 0)
@@ -48,7 +54,7 @@ internal sealed class MailboxMiddleware
         {
             var search = ctx.Request.Query["search"].FirstOrDefault();
             int.TryParse(ctx.Request.Query["page"], out var page); if (page < 1) page = 1;
-            int.TryParse(ctx.Request.Query["pageSize"], out var size); if (size < 1) size = 50;
+            int.TryParse(ctx.Request.Query["pageSize"], out var size); if (size < 1) size = 50; if (size > 500) size = 500;
             var total = store.Count(search);
             var items = store.List(search, (page - 1) * size, size).Select(Summary);
             await WriteJson(ctx, new { items, totalCount = total, page, pageSize = size });
@@ -68,8 +74,12 @@ internal sealed class MailboxMiddleware
                 if (msg == null || !int.TryParse(idxStr, out var i) || i < 0 || i >= msg.Attachments.Count)
                 { ctx.Response.StatusCode = 404; return; }
                 var att = msg.Attachments[i];
-                ctx.Response.ContentType = att.ContentType;
-                ctx.Response.Headers["Content-Disposition"] = $"attachment; filename=\"{att.FileName}\"";
+                // force a download rather than serving the attacker-supplied Content-Type
+                // (a text/html or SVG attachment would otherwise run in this origin)
+                ctx.Response.ContentType = "application/octet-stream";
+                // strip quotes/CR/LF so an attacker-named attachment can't inject headers
+                var safeName = att.FileName.Replace("\"", "").Replace("\r", "").Replace("\n", "");
+                ctx.Response.Headers["Content-Disposition"] = $"attachment; filename=\"{safeName}\"";
                 await ctx.Response.Body.WriteAsync(att.Content);
                 return;
             }

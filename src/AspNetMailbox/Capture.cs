@@ -60,7 +60,7 @@ internal sealed class Mailbox : IMailbox
         using var ms = new MemoryStream();
         message.WriteTo(ms);
         var mapped = MailboxMapper.Map(message, ms.Length);
-        mapped.Raw = System.Text.Encoding.UTF8.GetString(ms.ToArray());
+        mapped.Raw = System.Text.Encoding.Latin1.GetString(ms.ToArray());
         _store.Save(mapped);
     }
 }
@@ -69,7 +69,8 @@ internal sealed class Mailbox : IMailbox
 internal sealed class SinkMessageStore : MessageStore
 {
     private readonly IMailboxStore _store;
-    public SinkMessageStore(IMailboxStore store) => _store = store;
+    private readonly ILogger _log;
+    public SinkMessageStore(IMailboxStore store, ILogger log) { _store = store; _log = log; }
 
     public override async Task<SmtpResponse> SaveAsync(
         ISessionContext context, IMessageTransaction transaction,
@@ -83,12 +84,14 @@ internal sealed class SinkMessageStore : MessageStore
             ms.Position = 0;
             var message = await MimeMessage.LoadAsync(ms, cancellationToken);
             var mapped = MailboxMapper.Map(message, raw.Length);
-            mapped.Raw = System.Text.Encoding.UTF8.GetString(raw);
+            // Latin1 round-trips raw bytes 1:1 (UTF-8 would mangle binary/8-bit parts)
+            mapped.Raw = System.Text.Encoding.Latin1.GetString(raw);
             _store.Save(mapped);
         }
-        catch
+        catch (Exception ex)
         {
             // a malformed message must not break the dev SMTP session
+            _log.LogDebug(ex, "Mailbox could not store an incoming message");
         }
         return SmtpResponse.Ok;
     }
@@ -100,27 +103,38 @@ internal sealed class SmtpSinkService : BackgroundService
 {
     private readonly MailboxOptions _options;
     private readonly IMailboxStore _store;
+    private readonly IHostEnvironment _env;
     private readonly ILogger<SmtpSinkService> _log;
 
-    public SmtpSinkService(MailboxOptions options, IMailboxStore store, ILogger<SmtpSinkService> log)
+    public SmtpSinkService(MailboxOptions options, IMailboxStore store, IHostEnvironment env, ILogger<SmtpSinkService> log)
     {
         _options = options;
         _store = store;
+        _env = env;
         _log = log;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // Never open a listening SMTP port in production unless explicitly asked.
+        if (!_options.AlwaysRunSink && !_env.IsDevelopment())
+        {
+            _log.LogInformation("Mailbox SMTP sink stays off outside Development");
+            return;
+        }
+
         try
         {
             var options = new SmtpServerOptionsBuilder()
                 .ServerName("aspnetmailbox")
                 .Endpoint(b => b.Port(_options.SmtpPort, isSecure: false))
+                .MaxMessageSize(_options.MaxMessageSizeBytes)
                 .Build();
 
             var provider = new ServiceProvider();
-            provider.Add(new SinkMessageStore(_store));
+            provider.Add(new SinkMessageStore(_store, _log));
 
+            // SmtpServer (v11) isn't IDisposable; it stops when the token cancels.
             var server = new SmtpServer.SmtpServer(options, provider);
             _log.LogInformation("Mailbox SMTP sink listening on port {Port}", _options.SmtpPort);
             await server.StartAsync(stoppingToken);

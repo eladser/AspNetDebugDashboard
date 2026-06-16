@@ -43,21 +43,27 @@ public sealed class LiteDbMailboxStore : IMailboxStore, IDisposable
 
     public IReadOnlyList<MailboxMessage> List(string? search, int skip, int take)
     {
-        var q = _col.Query();
-        if (!string.IsNullOrWhiteSpace(search))
-            q = q.Where(x => x.Subject.Contains(search) || x.From.Contains(search));
-        return q.OrderByDescending(x => x.ReceivedAt).Skip(skip).Limit(take).ToList();
+        lock (_gate)
+        {
+            var q = _col.Query();
+            if (!string.IsNullOrWhiteSpace(search))
+                q = q.Where(x => x.Subject.Contains(search) || x.From.Contains(search));
+            return q.OrderByDescending(x => x.ReceivedAt).Skip(skip).Limit(take).ToList();
+        }
     }
 
     public int Count(string? search)
     {
-        var q = _col.Query();
-        if (!string.IsNullOrWhiteSpace(search))
-            q = q.Where(x => x.Subject.Contains(search) || x.From.Contains(search));
-        return q.Count();
+        lock (_gate)
+        {
+            var q = _col.Query();
+            if (!string.IsNullOrWhiteSpace(search))
+                q = q.Where(x => x.Subject.Contains(search) || x.From.Contains(search));
+            return q.Count();
+        }
     }
 
-    public MailboxMessage? Get(string id) => _col.FindById(id);
+    public MailboxMessage? Get(string id) { lock (_gate) return _col.FindById(id); }
 
     public void Clear() { lock (_gate) _col.DeleteAll(); }
 

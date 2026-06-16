@@ -14,7 +14,9 @@ public static class MailboxExtensions
         configure?.Invoke(options);
 
         services.AddSingleton(options);
-        services.AddSingleton<IMailboxStore>(_ => new LiteDbMailboxStore(options));
+        // register the concrete type so the container disposes the LiteDB handle at shutdown
+        services.AddSingleton(_ => new LiteDbMailboxStore(options));
+        services.AddSingleton<IMailboxStore>(sp => sp.GetRequiredService<LiteDbMailboxStore>());
         services.AddSingleton<IMailbox, Mailbox>();
 
         if (options.IsEnabled && options.EnableSmtpSink)
