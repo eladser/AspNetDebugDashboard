@@ -8,11 +8,27 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-support-ff5e5b?logo=kofi&logoColor=white)](https://ko-fi.com/eladser)
 
-Request, SQL query, log, and exception capture for ASP.NET Core, viewable in a dashboard at `/_debug`. Think Laravel Telescope, but for .NET.
+Request, SQL query, log, and exception capture for ASP.NET Core, viewable in a dashboard at `/_debug`, and the hub of a small suite of local-first dev tools. Think Laravel Telescope, but for .NET.
 
 Everything is stored locally in a LiteDB file. The dashboard ships inside the package as a single self-contained page, so there are no CDN dependencies and it works offline.
 
 ![Demo](https://raw.githubusercontent.com/eladser/AspNetDebugDashboard/main/docs/images/demo.gif)
+
+## The suite
+
+The dashboard is the hub of a set of local-first dev tools that follow the same recipe: install a package, get a self-contained page at a `/_*` route, no extra infrastructure. Each works on its own, and when more than one is installed they share a sidebar so you can move between them.
+
+![Suite](https://raw.githubusercontent.com/eladser/AspNetDebugDashboard/main/docs/images/suite-demo.gif)
+
+| Package | NuGet | Route | What it does |
+| --- | --- | --- | --- |
+| [AspNetDebugDashboard](src/AspNetDebugDashboard/) | [![NuGet](https://img.shields.io/nuget/v/AspNetDebugDashboard.svg)](https://www.nuget.org/packages/AspNetDebugDashboard/) | `/_debug` | Request, SQL, log, and exception capture (this package). |
+| [AspNetMailbox](src/AspNetMailbox/) | [![NuGet](https://img.shields.io/nuget/v/AspNetMailbox.svg)](https://www.nuget.org/packages/AspNetMailbox/) | `/_mailbox` | Captures outbound email in-process and previews it (HTML, text, headers, attachments). No mail server. |
+| [AspNetFlags](src/AspNetFlags/) | [![NuGet](https://img.shields.io/nuget/v/AspNetFlags.svg)](https://www.nuget.org/packages/AspNetFlags/) | `/_flags` | Feature flags with a toggle UI. Flags appear the first time your code checks them. |
+| [AspNetJobs](src/AspNetJobs/) | [![NuGet](https://img.shields.io/nuget/v/AspNetJobs.svg)](https://www.nuget.org/packages/AspNetJobs/) | `/_jobs` | Background jobs that run in-process, with a live inspector showing status, timing, and stack traces. |
+| [AspNetVitals](src/AspNetVitals/) | [![NuGet](https://img.shields.io/nuget/v/AspNetVitals.svg)](https://www.nuget.org/packages/AspNetVitals/) | `/_vitals` | Live memory, GC, threads, uptime, and your registered health checks on one page. |
+
+There's also [AspNetDebugDashboard.Mcp](https://www.nuget.org/packages/AspNetDebugDashboard.Mcp/) to expose all of it to an AI agent over MCP. Install only what you want; nothing else is pulled in.
 
 ## Install
 
@@ -23,7 +39,7 @@ dotnet add package AspNetDebugDashboard
 Or in the project file:
 
 ```xml
-<PackageReference Include="AspNetDebugDashboard" Version="2.1.1" />
+<PackageReference Include="AspNetDebugDashboard" Version="2.2.0" />
 ```
 
 Or from the Package Manager Console in Visual Studio:
@@ -229,19 +245,6 @@ curl http://localhost:5000/api/products
 curl http://localhost:5000/api/products/slow-operation
 curl http://localhost:5000/api/products/test-error
 ```
-
-## The AspNet* suite
-
-The dashboard is the hub of a set of local-first dev tools that follow the same recipe: install a package, get a self-contained page at a `/_*` route, no extra infrastructure. Each one works on its own.
-
-![Suite](https://raw.githubusercontent.com/eladser/AspNetDebugDashboard/main/docs/images/suite-demo.gif)
-
-| Package | Route | What it does |
-| --- | --- | --- |
-| [AspNetMailbox](src/AspNetMailbox/) | `/_mailbox` | Captures outbound email in-process and previews it (HTML, text, headers, attachments). No mail server. |
-| [AspNetFlags](src/AspNetFlags/) | `/_flags` | Feature flags with a toggle UI. Flags appear the first time your code checks them. |
-| [AspNetJobs](src/AspNetJobs/) | `/_jobs` | Background jobs that run in-process, with a live inspector showing status, timing, and stack traces. |
-| [AspNetVitals](src/AspNetVitals/) | `/_vitals` | Live memory, GC, threads, uptime, and your registered health checks on one page. |
 
 ## How the dashboard is built
 
