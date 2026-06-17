@@ -46,7 +46,7 @@ Jobs run one at a time in enqueue order. The `CancellationToken` is signalled on
 
 ## What you get
 
-`/_jobs` shows every job with its status, how long it ran, and when it was queued. Failed jobs expand to the full exception and stack trace. The page polls so running jobs update live. "Clear" drops finished records; in-flight jobs are kept.
+`/_jobs` shows every job with its status, how long it ran, and when it was queued. A summary row counts jobs per status, and you can filter by status or search by name. Failed jobs expand to the full exception and stack trace. The page polls so running jobs update live. "Clear" drops finished records; in-flight jobs are kept.
 
 ## Configuration
 

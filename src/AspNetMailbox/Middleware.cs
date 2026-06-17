@@ -38,6 +38,7 @@ internal sealed class MailboxMiddleware
         // captured mail is untrusted; never let a response be sniffed into an
         // executable type in the dashboard's origin
         ctx.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        ctx.Response.Headers["X-Frame-Options"] = "DENY";
 
         // page
         if (rest.Length == 0)
@@ -93,9 +94,7 @@ internal sealed class MailboxMiddleware
                 // force a download rather than serving the attacker-supplied Content-Type
                 // (a text/html or SVG attachment would otherwise run in this origin)
                 ctx.Response.ContentType = "application/octet-stream";
-                // strip quotes/CR/LF so an attacker-named attachment can't inject headers
-                var safeName = att.FileName.Replace("\"", "").Replace("\r", "").Replace("\n", "");
-                ctx.Response.Headers["Content-Disposition"] = $"attachment; filename=\"{safeName}\"";
+                ctx.Response.Headers["Content-Disposition"] = $"attachment; filename=\"{SafeFileName(att.FileName)}\"";
                 await ctx.Response.Body.WriteAsync(att.Content);
                 return;
             }
@@ -132,10 +131,11 @@ internal sealed class MailboxMiddleware
         attachments = m.Attachments.Select((a, i) => new { index = i, a.FileName, a.ContentType, a.Size }),
     };
 
-    // keep a download filename to safe characters; CR/LF/quote stripping prevents header injection
+    // ASCII-only download filename: non-ASCII bytes are invalid in an HTTP header (Kestrel throws),
+    // and dropping ; = " CR LF prevents Content-Disposition parsing tricks / header injection.
     private static string SafeFileName(string s)
     {
-        var clean = new string(s.Select(c => char.IsLetterOrDigit(c) || c is '-' or '_' or ' ' ? c : '_').ToArray()).Trim();
+        var clean = new string(s.Select(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or ' ' or '.' ? c : '_').ToArray()).Trim();
         if (clean.Length > 80) clean = clean.Substring(0, 80);
         return clean.Length == 0 ? "message" : clean;
     }

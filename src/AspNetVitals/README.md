@@ -38,7 +38,7 @@ No health checks registered? The page still shows process metrics and tells you 
 
 ## What you get
 
-`/_vitals` shows managed and working-set memory, GC collection counts per generation, thread count, processor count, uptime, and the runtime/environment. Below that, every registered health check with a color-coded status. The page polls so the numbers move as your app works.
+`/_vitals` shows a live memory sparkline plus managed and working-set memory, CPU usage, GC collection counts per generation, total allocated bytes, thread and assembly counts, GC mode, uptime, and the runtime/OS. Below that, every registered health check with a color-coded status. The page polls so the numbers move as your app works.
 
 ## Configuration
 

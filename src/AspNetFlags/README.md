@@ -39,7 +39,7 @@ The first check for an unknown flag registers it (off) so it shows up at `/_flag
 
 ## What you get
 
-`/_flags` lists every flag your app has touched, each with an on/off switch and when it last changed. Toggling persists immediately; changes take effect on the next `IsEnabled` call. The page polls so flags discovered by other requests show up live.
+`/_flags` lists every flag your app has touched, each with an on/off switch and when it last changed. Toggling persists immediately; changes take effect on the next `IsEnabled` call. You can also add a flag by name or delete one from the page, and filter the list once it grows. The page polls so flags discovered by other requests show up live.
 
 ## Configuration
 

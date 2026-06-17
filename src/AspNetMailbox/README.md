@@ -45,7 +45,7 @@ public class Notifier(IMailbox mailbox)
 
 ## What you get
 
-`/_mailbox` lists captured mail. Open one for tabs: rendered **Preview** (sandboxed, captured HTML can't run scripts in your dashboard), **HTML**, **Text**, **Headers**, **Raw** source, and **Attachments** (downloadable). Search by subject or sender.
+`/_mailbox` lists captured mail. Open one for tabs: rendered **Preview** (sandboxed, captured HTML can't run scripts in your dashboard) with a light/dark background toggle, **HTML**, **Text**, **Headers**, **Raw** source, and **Attachments** (downloadable). Search by subject or sender, or download the whole message as a `.eml` file.
 
 ## Configuration
 
