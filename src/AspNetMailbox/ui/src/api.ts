@@ -50,4 +50,5 @@ export const api = {
   get: (id: string) => getJson<MailDetail>(`${apiBase}/messages/${id}`),
   clear: () => fetch(`${apiBase}/clear`, { method: 'DELETE' }),
   attachmentUrl: (id: string, index: number) => `${apiBase}/messages/${id}/attachments/${index}`,
+  emlUrl: (id: string) => `${apiBase}/messages/${id}/eml`,
 };

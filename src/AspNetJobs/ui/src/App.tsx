@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { api, type Job } from './api';
+import { api, type Job, type JobStatus } from './api';
 import { fmtDuration, timeAgo, fmtDateTime } from './format';
 
 const POLL_MS = 2000;
+const STATUSES: JobStatus[] = ['Pending', 'Running', 'Succeeded', 'Failed'];
 
 export default function App() {
   const [jobs, setJobs] = useState<Job[] | null>(null);
@@ -10,6 +11,8 @@ export default function App() {
   const [open, setOpen] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const [live, setLive] = useState(true);
+  const [filter, setFilter] = useState<JobStatus | 'all'>('all');
+  const [q, setQ] = useState('');
 
   useEffect(() => {
     if (!live) return;
@@ -24,8 +27,10 @@ export default function App() {
     return () => ctrl.abort();
   }, [tick]);
 
-  const running = jobs?.filter(j => j.status === 'Running').length ?? 0;
-  const failed = jobs?.filter(j => j.status === 'Failed').length ?? 0;
+  const counts = (s: JobStatus) => jobs?.filter(j => j.status === s).length ?? 0;
+  const shown = jobs?.filter(j =>
+    (filter === 'all' || j.status === filter) &&
+    (!q || j.name.toLowerCase().includes(q.toLowerCase())));
 
   const clear = async () => { await api.clear(); setTick(n => n + 1); };
 
@@ -33,7 +38,10 @@ export default function App() {
     <div className="main" style={{ height: '100vh' }}>
       <div className="topbar">
         <h1>Background Jobs</h1>
-        <span className="sub">{jobs?.length ?? 0} jobs{running ? ` · ${running} running` : ''}{failed ? ` · ${failed} failed` : ''}</span>
+        <span className="sub">{jobs?.length ?? 0} jobs</span>
+        {jobs && jobs.length > 0 && (
+          <input className="search" placeholder="Search jobs…" value={q} onChange={e => setQ(e.target.value)} style={{ marginLeft: 16, width: 200 }} />
+        )}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
           <button className="live-toggle" onClick={clear} title="Remove finished jobs">clear</button>
           <button className={`live-toggle${live ? ' on' : ''}`} onClick={() => setLive(v => !v)}>
@@ -50,13 +58,23 @@ export default function App() {
         <Empty />
       ) : (
         <div className="page-scroll">
+          <div className="job-stats">
+            <button className={`chip${filter === 'all' ? ' on' : ''}`} onClick={() => setFilter('all')}>
+              <span className="cn">{jobs.length}</span> all
+            </button>
+            {STATUSES.map(s => (
+              <button key={s} className={`chip ${s.toLowerCase()}${filter === s ? ' on' : ''}`} onClick={() => setFilter(filter === s ? 'all' : s)}>
+                <span className="cn">{counts(s)}</span> {s.toLowerCase()}
+              </button>
+            ))}
+          </div>
           <div className="table-wrap">
             <table>
               <thead>
                 <tr><th style={{ width: 110 }}>Status</th><th>Job</th><th style={{ width: 130 }}>Enqueued</th><th style={{ width: 110 }}>Duration</th></tr>
               </thead>
               <tbody>
-                {jobs.map(j => {
+                {shown!.map(j => {
                   const expandable = !!j.error;
                   return [
                     <tr key={j.jobId} onClick={() => expandable && setOpen(open === j.jobId ? null : j.jobId)} style={{ cursor: expandable ? 'pointer' : 'default' }}>
@@ -72,6 +90,7 @@ export default function App() {
                 })}
               </tbody>
             </table>
+            {shown!.length === 0 && <div style={{ padding: '16px', color: 'var(--faint)', fontSize: 13 }}>No jobs match.</div>}
           </div>
         </div>
       )}

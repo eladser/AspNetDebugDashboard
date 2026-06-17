@@ -960,3 +960,13 @@ pre.code {
   min-width: 60px;
 }
 .bar-cell .track i { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
+
+/* ---------- preview background toggle ---------- */
+.preview-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 12px; }
+.seg {
+  font-family: var(--mono); font-size: 11px; padding: 3px 10px; cursor: pointer;
+  background: var(--raised); color: var(--muted);
+  border: 1px solid var(--border-strong); border-radius: 5px;
+}
+.seg:hover { color: var(--text); }
+.seg.on { color: var(--accent); border-color: rgba(65,200,173,0.4); }

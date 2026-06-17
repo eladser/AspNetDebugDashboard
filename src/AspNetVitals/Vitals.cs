@@ -33,7 +33,12 @@ public sealed class VitalsSnapshot
     public int Gen2 { get; set; }
     public int ThreadCount { get; set; }
     public int ProcessorCount { get; set; }
+    public double CpuPercent { get; set; }
+    public long TotalAllocatedBytes { get; set; }
+    public int AssemblyCount { get; set; }
+    public bool ServerGc { get; set; }
     public string Runtime { get; set; } = "";
+    public string Os { get; set; } = "";
     public string Environment { get; set; } = "";
     public string? OverallHealth { get; set; }   // null when no health checks are registered
     public List<HealthEntry> HealthChecks { get; set; } = new();
@@ -51,6 +56,8 @@ internal sealed class VitalsCollector
     // ponytail: instance cache, no lock. Worst case two concurrent polls recompute.
     private VitalsSnapshot? _cache;
     private DateTime _cacheAt;
+    private TimeSpan _lastCpu;
+    private DateTime _lastCpuAt;
 
     public VitalsCollector(IHostEnvironment env, VitalsOptions options, HealthCheckService? health = null)
     {
@@ -70,7 +77,11 @@ internal sealed class VitalsCollector
             Gen1 = GC.CollectionCount(1),
             Gen2 = GC.CollectionCount(2),
             ProcessorCount = Environment.ProcessorCount,
+            TotalAllocatedBytes = GC.GetTotalAllocatedBytes(),
+            AssemblyCount = AppDomain.CurrentDomain.GetAssemblies().Length,
+            ServerGc = System.Runtime.GCSettings.IsServerGC,
             Runtime = RuntimeInformation.FrameworkDescription,
+            Os = RuntimeInformation.OSDescription,
             Environment = _env.EnvironmentName,
         };
 
@@ -81,6 +92,18 @@ internal sealed class VitalsCollector
             snap.UptimeSeconds = (DateTime.UtcNow - Proc.StartTime.ToUniversalTime()).TotalSeconds;
             snap.WorkingSetBytes = Proc.WorkingSet64;
             snap.ThreadCount = Proc.Threads.Count;
+
+            // CPU% from processor-time delta over wall-clock since the last real sample
+            var cpu = Proc.TotalProcessorTime;
+            var now = DateTime.UtcNow;
+            if (_lastCpuAt != default)
+            {
+                var wallMs = (now - _lastCpuAt).TotalMilliseconds;
+                if (wallMs > 0)
+                    snap.CpuPercent = Math.Clamp((cpu - _lastCpu).TotalMilliseconds / (wallMs * Environment.ProcessorCount) * 100, 0, 100);
+            }
+            _lastCpu = cpu;
+            _lastCpuAt = now;
         }
         catch { /* metrics unavailable in this environment */ }
 

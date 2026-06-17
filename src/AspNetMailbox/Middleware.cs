@@ -64,6 +64,21 @@ internal sealed class MailboxMiddleware
         if (rest.StartsWith("/api/messages/"))
         {
             var tail = rest.Substring("/api/messages/".Length);
+
+            // raw .eml download: {id}/eml
+            if (tail.EndsWith("/eml", StringComparison.Ordinal))
+            {
+                var id = tail.Substring(0, tail.Length - "/eml".Length);
+                var msg = store.Get(id);
+                if (msg == null) { ctx.Response.StatusCode = 404; return; }
+                ctx.Response.ContentType = "message/rfc822";
+                var fname = SafeFileName(string.IsNullOrWhiteSpace(msg.Subject) ? id : msg.Subject) + ".eml";
+                ctx.Response.Headers["Content-Disposition"] = $"attachment; filename=\"{fname}\"";
+                // Raw was captured via Latin1 to preserve bytes; round-trip the same way
+                await ctx.Response.Body.WriteAsync(System.Text.Encoding.Latin1.GetBytes(msg.Raw ?? ""));
+                return;
+            }
+
             // attachment download: {id}/attachments/{index}
             var attIdx = tail.IndexOf("/attachments/", StringComparison.Ordinal);
             if (attIdx >= 0)
@@ -115,6 +130,14 @@ internal sealed class MailboxMiddleware
         m.HtmlBody, m.TextBody, m.Headers, m.Size, m.Raw,
         attachments = m.Attachments.Select((a, i) => new { index = i, a.FileName, a.ContentType, a.Size }),
     };
+
+    // keep a download filename to safe characters; CR/LF/quote stripping prevents header injection
+    private static string SafeFileName(string s)
+    {
+        var clean = new string(s.Select(c => char.IsLetterOrDigit(c) || c is '-' or '_' or ' ' ? c : '_').ToArray()).Trim();
+        if (clean.Length > 80) clean = clean.Substring(0, 80);
+        return clean.Length == 0 ? "message" : clean;
+    }
 
     private static async Task WriteJson(HttpContext ctx, object value)
     {

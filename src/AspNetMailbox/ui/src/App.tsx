@@ -117,6 +117,7 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
   const [m, setM] = useState<(MailDetail) | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('preview');
+  const [lightPreview, setLightPreview] = useState(true);
 
   useEffect(() => {
     setM(null); setErr(null); setTab('preview');
@@ -145,6 +146,7 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
         <div className="detail-head">
           <div className="row1">
             <span className="title">{m?.subject || (m ? '(no subject)' : '')}</span>
+            {m && <a className="btn" href={api.emlUrl(m.id)} download style={{ marginLeft: 'auto' }}>Download .eml</a>}
             <button className="detail-close" onClick={onClose} aria-label="Close">✕</button>
           </div>
           {m && (
@@ -170,11 +172,18 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
             </div>
             <div className="detail-body">
               {tab === 'preview' && (
-                m.htmlBody
-                  // sandboxed: captured email is untrusted, never let it run scripts in the dashboard
-                  ? <iframe title="preview" sandbox="" srcDoc={m.htmlBody}
-                      style={{ width: '100%', height: '60vh', border: '1px solid var(--border)', borderRadius: 8, background: '#fff' }} />
-                  : <pre className="code">{m.textBody || '(no body)'}</pre>
+                m.htmlBody ? (
+                  <>
+                    <div className="preview-bar">
+                      <span className="dim">background</span>
+                      <button className={`seg${lightPreview ? ' on' : ''}`} onClick={() => setLightPreview(true)}>light</button>
+                      <button className={`seg${!lightPreview ? ' on' : ''}`} onClick={() => setLightPreview(false)}>dark</button>
+                    </div>
+                    {/* sandboxed: captured email is untrusted, never let it run scripts in the dashboard */}
+                    <iframe title="preview" sandbox="" srcDoc={m.htmlBody}
+                      style={{ width: '100%', height: '56vh', border: '1px solid var(--border)', borderRadius: 8, background: lightPreview ? '#fff' : '#15191f' }} />
+                  </>
+                ) : <pre className="code">{m.textBody || '(no body)'}</pre>
               )}
               {tab === 'html' && <pre className="code">{m.htmlBody || '(no HTML body)'}</pre>}
               {tab === 'text' && <pre className="code">{m.textBody || '(no text body)'}</pre>}

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, type Vitals } from './api';
 import { fmtBytes } from './format';
 
 const POLL_MS = 2000;
+const HISTORY = 60;
 
 function uptime(s: number): string {
   const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
@@ -17,6 +18,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const [live, setLive] = useState(true);
+  const mem = useRef<number[]>([]);
 
   useEffect(() => {
     if (!live) return;
@@ -26,8 +28,10 @@ export default function App() {
 
   useEffect(() => {
     const ctrl = new AbortController();
-    api.get(ctrl.signal).then(d => { setV(d); setError(null); })
-      .catch(e => { if (!ctrl.signal.aborted) setError(String(e.message ?? e)); });
+    api.get(ctrl.signal).then(d => {
+      mem.current = [...mem.current, d.managedMemoryBytes].slice(-HISTORY);
+      setV(d); setError(null);
+    }).catch(e => { if (!ctrl.signal.aborted) setError(String(e.message ?? e)); });
     return () => ctrl.abort();
   }, [tick]);
 
@@ -47,14 +51,27 @@ export default function App() {
         <div className="table-wrap"><div className="skeleton-rows">{[0, 1, 2].map(i => <div key={i} className="skeleton" style={{ width: `${60 - i * 8}%` }} />)}</div></div>
       ) : (
         <div className="page-scroll" style={{ padding: '20px 24px' }}>
+          <div className="mem-card">
+            <div className="mem-head">
+              <span className="stat-label">managed memory</span>
+              <span className="mem-now">{fmtBytes(v.managedMemoryBytes)}</span>
+            </div>
+            <Spark data={mem.current} />
+          </div>
+
           <div className="stat-grid">
-            <Stat label="memory (managed)" value={fmtBytes(v.managedMemoryBytes)} />
+            <Stat label="cpu" value={`${v.cpuPercent.toFixed(1)}%`} />
             <Stat label="working set" value={fmtBytes(v.workingSetBytes)} />
             <Stat label="uptime" value={uptime(v.uptimeSeconds)} />
             <Stat label="threads" value={String(v.threadCount)} />
             <Stat label="gc (gen 0 / 1 / 2)" value={`${v.gen0} / ${v.gen1} / ${v.gen2}`} />
+            <Stat label="allocated total" value={fmtBytes(v.totalAllocatedBytes)} />
+            <Stat label="assemblies" value={String(v.assemblyCount)} />
+            <Stat label="gc mode" value={v.serverGc ? 'server' : 'workstation'} />
             <Stat label="processors" value={String(v.processorCount)} />
           </div>
+
+          <div className="vh-os">{v.os}</div>
 
           <div className="vh-head">
             <span className="vh-title">Health checks</span>
@@ -88,5 +105,20 @@ function Stat({ label, value }: { label: string; value: string }) {
       <div className="stat-label">{label}</div>
       <div className="stat-value">{value}</div>
     </div>
+  );
+}
+
+// tiny inline-SVG sparkline of the memory history
+function Spark({ data }: { data: number[] }) {
+  const W = 100, H = 100;
+  if (data.length < 2) return <svg className="spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" />;
+  const min = Math.min(...data), max = Math.max(...data), span = max - min || 1;
+  const pts = data.map((d, i) => `${(i / (data.length - 1)) * W},${H - ((d - min) / span) * (H - 8) - 4}`);
+  const area = `0,${H} ${pts.join(' ')} ${W},${H}`;
+  return (
+    <svg className="spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+      <polygon points={area} fill="var(--accent-dim)" />
+      <polyline points={pts.join(' ')} fill="none" stroke="var(--accent)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+    </svg>
   );
 }

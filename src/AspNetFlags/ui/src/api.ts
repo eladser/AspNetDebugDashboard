@@ -11,4 +11,6 @@ export const api = {
     fetch(`${apiBase}/flags/${encodeURIComponent(name)}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }),
     }),
+  remove: (name: string) =>
+    fetch(`${apiBase}/flags/${encodeURIComponent(name)}`, { method: 'DELETE' }),
 };

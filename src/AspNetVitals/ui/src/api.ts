@@ -19,7 +19,12 @@ export interface Vitals {
   gen2: number;
   threadCount: number;
   processorCount: number;
+  cpuPercent: number;
+  totalAllocatedBytes: number;
+  assemblyCount: number;
+  serverGc: boolean;
   runtime: string;
+  os: string;
   environment: string;
   overallHealth?: string | null;
   healthChecks: HealthEntry[];

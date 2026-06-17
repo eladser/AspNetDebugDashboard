@@ -9,6 +9,8 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const [live, setLive] = useState(true);
+  const [q, setQ] = useState('');
+  const [adding, setAdding] = useState('');
 
   useEffect(() => {
     if (!live) return;
@@ -31,11 +33,30 @@ export default function App() {
     setTick((n) => n + 1);
   };
 
+  const remove = async (f: Flag) => {
+    setFlags((cur) => cur?.filter((x) => x.name !== f.name) ?? cur);
+    await api.remove(f.name);
+    setTick((n) => n + 1);
+  };
+
+  const add = async () => {
+    const name = adding.trim();
+    if (!name) return;
+    setAdding('');
+    await api.set(name, false);
+    setTick((n) => n + 1);
+  };
+
+  const shown = flags?.filter((f) => !q || f.name.toLowerCase().includes(q.toLowerCase()));
+
   return (
     <div className="main" style={{ height: '100vh' }}>
       <div className="topbar">
         <h1>Feature Flags</h1>
         <span className="sub">{flags?.length ?? 0} flags</span>
+        {flags && flags.length > 0 && (
+          <input className="search" placeholder="Filter…" value={q} onChange={(e) => setQ(e.target.value)} style={{ marginLeft: 16, width: 200 }} />
+        )}
         <button className={`live-toggle${live ? ' on' : ''}`} onClick={() => setLive((v) => !v)} style={{ marginLeft: 'auto' }}>
           <span className="live-dot" />{live ? 'live' : 'paused'}
         </button>
@@ -50,7 +71,16 @@ export default function App() {
       ) : (
         <div className="page-scroll">
           <div className="mini-list" style={{ maxWidth: 720 }}>
-            {flags.map((f) => (
+            <div className="flag-add">
+              <input
+                placeholder="new flag name…"
+                value={adding}
+                onChange={(e) => setAdding(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') add(); }}
+              />
+              <button className="btn" onClick={add} disabled={!adding.trim()}>Add</button>
+            </div>
+            {shown!.map((f) => (
               <div key={f.name} className="flag-row">
                 <div className="info">
                   <div className="fname">{f.name}</div>
@@ -62,8 +92,10 @@ export default function App() {
                   <span className="track" />
                   <span className="thumb" />
                 </label>
+                <button className="frow-del" title="Delete flag" onClick={() => remove(f)}>✕</button>
               </div>
             ))}
+            {shown!.length === 0 && <div className="fdesc" style={{ padding: '14px 18px' }}>No flags match "{q}".</div>}
           </div>
         </div>
       )}
