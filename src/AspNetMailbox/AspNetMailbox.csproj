@@ -7,7 +7,7 @@
     <PackageId>AspNetMailbox</PackageId>
     <Title>ASP.NET Mailbox</Title>
     <Version>0.1.0</Version>
-    <Description>Captures outbound email in-process during development and previews it at /_debug/mail. Point your SMTP sender at the built-in sink, or capture explicitly. No separate mail server, no Docker. Part of the AspNetDebugDashboard suite.</Description>
+    <Description>Captures outbound email in-process during development and previews it at /_mailbox. Point your SMTP sender at the built-in sink, or capture explicitly. No separate mail server, no Docker. Part of the AspNetDebugDashboard suite.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageTags>aspnetcore;email;smtp;mail;developer-tools;debugging;mailpit;testing</PackageTags>
@@ -32,6 +32,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AspNetDebugDashboard.Suite\AspNetDebugDashboard.Suite.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AspNetDebugDashboard.Tests" />
   </ItemGroup>
 
 </Project>
