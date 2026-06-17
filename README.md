@@ -168,7 +168,7 @@ The spans carry the request id, status, SQL text, and timing. They cost nothing 
 [![NuGet](https://img.shields.io/nuget/v/AspNetDebugDashboard.Mcp.svg?label=AspNetDebugDashboard.Mcp)](https://www.nuget.org/packages/AspNetDebugDashboard.Mcp/)
 [![Downloads](https://img.shields.io/nuget/dt/AspNetDebugDashboard.Mcp.svg)](https://www.nuget.org/packages/AspNetDebugDashboard.Mcp/)
 
-`AspNetDebugDashboard.Mcp` is a separate dotnet tool that exposes the captured data to a coding agent over MCP, so it can read recent requests, the SQL a request ran, recent failures, and performance numbers while it works on your app.
+`AspNetDebugDashboard.Mcp` is a separate dotnet tool that exposes the captured data to a coding agent over MCP, so it can read recent requests, the SQL a request ran, recent failures, and performance numbers while it works on your app. If you've installed the rest of the suite, it can also read your feature flags, background jobs, vitals, and captured mail.
 
 ```bash
 dotnet tool install --global AspNetDebugDashboard.Mcp
@@ -229,6 +229,19 @@ curl http://localhost:5000/api/products
 curl http://localhost:5000/api/products/slow-operation
 curl http://localhost:5000/api/products/test-error
 ```
+
+## The AspNet* suite
+
+The dashboard is the hub of a set of local-first dev tools that follow the same recipe: install a package, get a self-contained page at a `/_*` route, no extra infrastructure. Each one works on its own.
+
+![Suite](https://raw.githubusercontent.com/eladser/AspNetDebugDashboard/main/docs/images/suite-demo.gif)
+
+| Package | Route | What it does |
+| --- | --- | --- |
+| [AspNetMailbox](src/AspNetMailbox/) | `/_mailbox` | Captures outbound email in-process and previews it (HTML, text, headers, attachments). No mail server. |
+| [AspNetFlags](src/AspNetFlags/) | `/_flags` | Feature flags with a toggle UI. Flags appear the first time your code checks them. |
+| [AspNetJobs](src/AspNetJobs/) | `/_jobs` | Background jobs that run in-process, with a live inspector showing status, timing, and stack traces. |
+| [AspNetVitals](src/AspNetVitals/) | `/_vitals` | Live memory, GC, threads, uptime, and your registered health checks on one page. |
 
 ## How the dashboard is built
 

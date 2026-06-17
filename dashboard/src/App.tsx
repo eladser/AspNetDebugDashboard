@@ -50,6 +50,18 @@ const NAV: { group: string; tabs: { id: Tab; label: string; icon: React.ReactNod
 const ALL_TABS = NAV.flatMap((g) => g.tabs);
 const POLL_MS = 5000;
 
+// Sibling suite tools the server injected (Mailbox, Flags, Jobs, Vitals), if installed.
+interface SuitePanel { name: string; route: string; icon: string; }
+function readSuite(): { current: string; panels: SuitePanel[] } {
+  try {
+    const el = document.getElementById('__suite_nav__');
+    if (el?.textContent) return JSON.parse(el.textContent);
+  } catch { /* not in a suite */ }
+  return { current: '', panels: [] };
+}
+const SUITE = readSuite();
+const SIBLINGS = SUITE.panels.filter((p) => p.route !== SUITE.current);
+
 const tabFromHash = (): Tab => {
   const h = window.location.hash.replace('#', '');
   return ALL_TABS.some((t) => t.id === h) ? (h as Tab) : 'overview';
@@ -256,6 +268,17 @@ export default function App() {
             })}
           </div>
         ))}
+        {SIBLINGS.length > 0 && (
+          <div>
+            <div className="nav-group">Suite</div>
+            {SIBLINGS.map((p) => (
+              <a key={p.route} href={p.route} className="nav-item" style={{ textDecoration: 'none' }}>
+                <span dangerouslySetInnerHTML={{ __html: p.icon }} />
+                {p.name}
+              </a>
+            ))}
+          </div>
+        )}
         <div className="sidebar-footer">
           <a href={api.exportUrl}>export json</a>
           <span>AspNetDebugDashboard</span>

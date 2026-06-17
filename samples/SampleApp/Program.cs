@@ -1,4 +1,9 @@
 using AspNetDebugDashboard.Extensions;
+using AspNetMailbox;
+using AspNetFlags;
+using AspNetJobs;
+using AspNetVitals;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using SampleApp.Data;
 using SampleApp.Services;
@@ -36,6 +41,24 @@ builder.Services.AddDbContext<SampleDbContext>((sp, options) =>
     options.AddDebugDashboard(sp);
 });
 
+// Mailbox: capture outbound email at /_mailbox (SMTP sink on :2525).
+// AlwaysRunSink so the demo works even though the sample runs as Production.
+builder.Services.AddMailbox(o => o.AlwaysRunSink = true);
+
+// Feature flags at /_flags
+builder.Services.AddFlags();
+
+// Background jobs at /_jobs
+builder.Services.AddJobs();
+
+// Vitals at /_vitals (picks up the health checks below automatically)
+builder.Services.AddVitals();
+builder.Services.AddHealthChecks()
+    .AddCheck("self", () => HealthCheckResult.Healthy("running"))
+    .AddCheck("database", () => HealthCheckResult.Healthy("sqlite reachable"))
+    .AddCheck("disk-space", () => HealthCheckResult.Degraded("82% used"))
+    .AddCheck("redis-cache", () => HealthCheckResult.Unhealthy("connection refused"));
+
 // Add sample services
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
@@ -44,6 +67,29 @@ var app = builder.Build();
 
 // IMPORTANT: Force enable Debug Dashboard regardless of environment
 app.UseDebugDashboard(forceEnable: true);
+app.UseMailbox(forceEnable: true);
+app.UseFlags(forceEnable: true);
+app.UseJobs(forceEnable: true);
+app.UseVitals(forceEnable: true);
+
+// Enqueue a few demo jobs so /_jobs has something to show.
+{
+    var jobs = app.Services.GetRequiredService<IJobQueue>();
+    jobs.Enqueue("send-welcome-email", async ct => await Task.Delay(120, ct));
+    jobs.Enqueue("rebuild-search-index", async ct => await Task.Delay(900, ct));
+    jobs.Enqueue("generate-invoice-pdf", async ct => await Task.Delay(300, ct));
+    jobs.Enqueue("sync-inventory", _ => throw new InvalidOperationException("upstream returned 503"));
+    jobs.Enqueue("nightly-report", async ct => await Task.Delay(2500, ct));
+}
+
+// Seed a few flags so the demo has something to toggle (auto-discovered on first check).
+using (var scope = app.Services.CreateScope())
+{
+    var ff = scope.ServiceProvider.GetRequiredService<IFeatureFlags>();
+    foreach (var n in new[] { "new-checkout", "dark-mode", "beta-search", "promo-banner" }) ff.IsEnabled(n);
+    ff.Set("dark-mode", true);
+    ff.Set("beta-search", true);
+}
 
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())

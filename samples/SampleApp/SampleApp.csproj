@@ -13,6 +13,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\AspNetDebugDashboard\AspNetDebugDashboard.csproj" />
+    <ProjectReference Include="..\..\src\AspNetMailbox\AspNetMailbox.csproj" />
+    <ProjectReference Include="..\..\src\AspNetFlags\AspNetFlags.csproj" />
+    <ProjectReference Include="..\..\src\AspNetJobs\AspNetJobs.csproj" />
+    <ProjectReference Include="..\..\src\AspNetVitals\AspNetVitals.csproj" />
   </ItemGroup>
 
 </Project>

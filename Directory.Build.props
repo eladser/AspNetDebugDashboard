@@ -1,0 +1,31 @@
+<Project>
+
+  <!-- Shared identity + build settings for every package in the suite.
+       Project-specific bits (PackageId, Description, TargetFrameworks, Version)
+       stay in each .csproj. -->
+  <PropertyGroup>
+    <Authors>Elad Sertshuk</Authors>
+    <Company>Elad Sertshuk</Company>
+    <PackageProjectUrl>https://github.com/eladser/AspNetDebugDashboard</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/eladser/AspNetDebugDashboard</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+
+    <!-- Source-debuggable, reproducible packages: SourceLink + embedded sources + snupkg symbols.
+         Lets consumers step into the package source straight from a stack trace. -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true' or '$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+  </ItemGroup>
+
+</Project>

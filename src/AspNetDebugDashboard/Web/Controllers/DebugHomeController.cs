@@ -15,9 +15,12 @@ public class DebugHomeController : Controller
     private static string? _html;
     private static readonly object _lock = new();
 
-    public DebugHomeController(IOptions<DebugConfiguration> config)
+    private readonly IServiceProvider _services;
+
+    public DebugHomeController(IOptions<DebugConfiguration> config, IServiceProvider services)
     {
         _config = config.Value;
+        _services = services;
     }
 
     [HttpGet("/_debug")]
@@ -37,7 +40,10 @@ public class DebugHomeController : Controller
         var html = LoadHtml();
         if (html == null) return NotFound();
 
-        return Content(html.Replace("__BASE_PATH__", _config.BasePath), "text/html");
+        var nav = Suite.SuiteNav.BuildJson(_services, _config.BasePath);
+        return Content(
+            html.Replace("__BASE_PATH__", _config.BasePath).Replace("__SUITE_NAV__", nav),
+            "text/html");
     }
 
     private static string? LoadHtml()

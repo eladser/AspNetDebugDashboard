@@ -42,6 +42,13 @@ Point your MCP client at the `aspnet-debug-mcp` command. For Claude Desktop / Cl
 - `performance`: last-hour metrics (P95/P99, error rate, slowest endpoints)
 - `search`: across all captured data
 
+If the rest of the suite is installed, these are available too:
+
+- `list_feature_flags`: feature flags and their on/off state (AspNetFlags)
+- `recent_jobs`: background jobs with status, timing, and failure traces (AspNetJobs)
+- `app_vitals`: memory, GC, CPU, threads, uptime, and health checks (AspNetVitals)
+- `recent_mail`: captured outbound email (AspNetMailbox)
+
 ## License
 
 MIT

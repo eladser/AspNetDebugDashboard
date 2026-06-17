@@ -36,11 +36,12 @@ jobs:
           cache: npm
           cache-dependency-path: dashboard/package-lock.json
 
-      - name: Build dashboard UI
+      # rebuild every embedded UI so the packed assemblies match source
+      - name: Build embedded UIs
         run: |
-          cd dashboard
-          npm ci
-          npm run build
+          for ui in dashboard src/AspNetMailbox/ui src/AspNetFlags/ui src/AspNetJobs/ui src/AspNetVitals/ui; do
+            (cd "$ui" && npm ci && npm run build)
+          done
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -57,11 +58,16 @@ jobs:
 
       - name: Pack
         run: |
+          # core packages carry the release tag version
           for proj in src/AspNetDebugDashboard src/AspNetDebugDashboard.Mcp; do
             dotnet pack "$proj" -c Release --no-build -o artifacts \
               -p:PackageVersion=${{ steps.version.outputs.version }} \
               -p:AssemblyVersion=${{ steps.version.outputs.version }} \
               -p:FileVersion=${{ steps.version.outputs.version }}
+          done
+          # suite packages are versioned independently; pack at their own <Version>
+          for proj in src/AspNetDebugDashboard.Suite src/AspNetMailbox src/AspNetFlags src/AspNetJobs src/AspNetVitals; do
+            dotnet pack "$proj" -c Release --no-build -o artifacts
           done
 
       - name: Push

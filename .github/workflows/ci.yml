@@ -23,12 +23,12 @@ jobs:
           cache: npm
           cache-dependency-path: dashboard/package-lock.json
 
-      # rebuild the dashboard so the embedded HTML always matches dashboard/ source
-      - name: Build dashboard UI
+      # rebuild every embedded UI so the embedded HTML always matches source
+      - name: Build embedded UIs
         run: |
-          cd dashboard
-          npm ci
-          npm run build
+          for ui in dashboard src/AspNetMailbox/ui src/AspNetFlags/ui src/AspNetJobs/ui src/AspNetVitals/ui; do
+            (cd "$ui" && npm ci && npm run build)
+          done
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -47,7 +47,11 @@ jobs:
         run: dotnet test --no-build -c Release
 
       - name: Pack
-        run: dotnet pack src/AspNetDebugDashboard -c Release --no-build -o artifacts
+        run: |
+          for proj in src/AspNetDebugDashboard src/AspNetDebugDashboard.Mcp src/AspNetDebugDashboard.Suite \
+                      src/AspNetMailbox src/AspNetFlags src/AspNetJobs src/AspNetVitals; do
+            dotnet pack "$proj" -c Release --no-build -o artifacts
+          done
 
       - uses: actions/upload-artifact@v4
         with:
