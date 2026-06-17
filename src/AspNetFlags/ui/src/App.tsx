@@ -90,11 +90,11 @@ export default function App() {
                 </div>
                 <span className="fmeta" title={fmtDateTime(f.updatedAt)}>{timeAgo(f.updatedAt)}</span>
                 <label className={`switch${f.enabled ? ' on' : ''}`} title={f.enabled ? 'enabled' : 'disabled'}>
-                  <input type="checkbox" checked={f.enabled} onChange={() => toggle(f)} />
+                  <input type="checkbox" checked={f.enabled} onChange={() => toggle(f)} aria-label={`${f.name} ${f.enabled ? 'enabled' : 'disabled'}`} />
                   <span className="track" />
                   <span className="thumb" />
                 </label>
-                <button className="frow-del" title="Delete flag" onClick={() => remove(f)}>✕</button>
+                <button className="frow-del" title="Delete flag" aria-label={`Delete ${f.name}`} onClick={() => remove(f)}>✕</button>
               </div>
             ))}
             {shown!.length === 0 && <div className="fdesc" style={{ padding: '14px 18px' }}>No flags match "{q}".</div>}

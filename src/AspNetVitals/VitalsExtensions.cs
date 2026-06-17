@@ -17,7 +17,7 @@ public static class VitalsExtensions
         configure?.Invoke(options);
 
         services.AddSingleton(options);
-        // HealthCheckService is optional — only present if the app called AddHealthChecks
+        // HealthCheckService is optional, present only if the app called AddHealthChecks
         services.AddSingleton(sp => new VitalsCollector(
             sp.GetRequiredService<IHostEnvironment>(),
             options,

@@ -970,3 +970,13 @@ pre.code {
 }
 .seg:hover { color: var(--text); }
 .seg.on { color: var(--accent); border-color: rgba(65,200,173,0.4); }
+
+/* respect users who ask for less motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

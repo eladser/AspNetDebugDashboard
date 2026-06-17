@@ -83,7 +83,7 @@ export default function App() {
                       <td><Badge status={j.status} /></td>
                       <td style={{ fontFamily: 'var(--mono)', fontSize: 13 }}>{j.name}</td>
                       <td style={{ color: 'var(--faint)', fontFamily: 'var(--mono)', fontSize: 12 }} title={fmtDateTime(j.enqueuedAt)}>{timeAgo(j.enqueuedAt)}</td>
-                      <td style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--muted)' }}>{j.durationMs != null ? fmtDuration(j.durationMs) : '—'}</td>
+                      <td style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--muted)' }}>{j.durationMs != null ? fmtDuration(j.durationMs) : '·'}</td>
                     </tr>,
                     open === j.jobId && j.error ? (
                       <tr key={j.jobId + '-err'} className="err-row"><td colSpan={4}><pre className="err-trace">{j.error}</pre></td></tr>
