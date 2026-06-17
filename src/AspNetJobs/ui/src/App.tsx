@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { api, type Job, type JobStatus } from './api';
+import { api, basePath, type Job, type JobStatus } from './api';
 import { fmtDuration, timeAgo, fmtDateTime } from './format';
+import SuiteShell from './SuiteShell';
 
 const POLL_MS = 2000;
 const STATUSES: JobStatus[] = ['Pending', 'Running', 'Succeeded', 'Failed'];
@@ -35,6 +36,7 @@ export default function App() {
   const clear = async () => { await api.clear(); setTick(n => n + 1); };
 
   return (
+    <SuiteShell current={basePath}>
     <div className="main" style={{ height: '100vh' }}>
       <div className="topbar">
         <h1>Background Jobs</h1>
@@ -95,6 +97,7 @@ export default function App() {
         </div>
       )}
     </div>
+    </SuiteShell>
   );
 }
 

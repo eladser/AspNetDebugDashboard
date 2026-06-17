@@ -27,4 +27,8 @@
     <EmbeddedResource Include="wwwroot\**\*" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\AspNetDebugDashboard.Suite\AspNetDebugDashboard.Suite.csproj" />
+  </ItemGroup>
+
 </Project>

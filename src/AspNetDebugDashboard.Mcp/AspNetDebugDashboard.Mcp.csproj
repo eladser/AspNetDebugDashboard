@@ -9,9 +9,9 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>aspnet-debug-mcp</ToolCommandName>
     <PackageId>AspNetDebugDashboard.Mcp</PackageId>
-    <Version>2.1.1</Version>
+    <Version>2.2.0</Version>
     <Authors>Elad Sertshuk</Authors>
-    <Description>MCP server for AspNetDebugDashboard. Lets coding agents query captured requests, SQL queries, logs, exceptions, and performance from a running dashboard over its REST API.</Description>
+    <Description>MCP server for AspNetDebugDashboard. Lets coding agents query captured requests, SQL queries, logs, exceptions, and performance, plus the rest of the suite: feature flags, background jobs, vitals, and captured mail.</Description>
     <PackageProjectUrl>https://github.com/eladser/AspNetDebugDashboard</PackageProjectUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>

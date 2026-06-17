@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { api, type Vitals } from './api';
+import { api, basePath, type Vitals } from './api';
 import { fmtBytes } from './format';
+import SuiteShell from './SuiteShell';
 
 const POLL_MS = 2000;
 const HISTORY = 60;
@@ -36,6 +37,7 @@ export default function App() {
   }, [tick]);
 
   return (
+    <SuiteShell current={basePath}>
     <div className="main" style={{ height: '100vh' }}>
       <div className="topbar">
         <h1>Vitals</h1>
@@ -96,6 +98,7 @@ export default function App() {
         </div>
       )}
     </div>
+    </SuiteShell>
   );
 }
 

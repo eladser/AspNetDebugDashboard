@@ -58,4 +58,8 @@
     <InternalsVisibleTo Include="AspNetDebugDashboard.Tests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\AspNetDebugDashboard.Suite\AspNetDebugDashboard.Suite.csproj" />
+  </ItemGroup>
+
 </Project>

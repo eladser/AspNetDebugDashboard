@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { api, type Flag } from './api';
+import { api, basePath, type Flag } from './api';
 import { timeAgo, fmtDateTime } from './format';
+import SuiteShell from './SuiteShell';
 
 const POLL_MS = 4000;
 
@@ -50,6 +51,7 @@ export default function App() {
   const shown = flags?.filter((f) => !q || f.name.toLowerCase().includes(q.toLowerCase()));
 
   return (
+    <SuiteShell current={basePath}>
     <div className="main" style={{ height: '100vh' }}>
       <div className="topbar">
         <h1>Feature Flags</h1>
@@ -100,6 +102,7 @@ export default function App() {
         </div>
       )}
     </div>
+    </SuiteShell>
   );
 }
 

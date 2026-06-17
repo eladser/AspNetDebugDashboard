@@ -1,3 +1,4 @@
+using AspNetDebugDashboard.Suite;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,6 +8,8 @@ namespace AspNetJobs;
 
 public static class JobsExtensions
 {
+    private const string Icon = "<svg width=\"15\" height=\"15\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"><rect x=\"2\" y=\"3\" width=\"12\" height=\"3.2\" rx=\"1\"/><rect x=\"2\" y=\"9.8\" width=\"12\" height=\"3.2\" rx=\"1\"/></svg>";
+
     public static IServiceCollection AddJobs(this IServiceCollection services, Action<JobsOptions>? configure = null)
     {
         var options = new JobsOptions();
@@ -20,6 +23,7 @@ public static class JobsExtensions
         services.AddSingleton<JobQueue>();
         services.AddSingleton<IJobQueue>(sp => sp.GetRequiredService<JobQueue>());
         services.AddHostedService(sp => sp.GetRequiredService<JobQueue>());
+        services.AddSuitePanel(new SuitePanel("Jobs", options.BasePath, Icon, 30));
 
         return services;
     }

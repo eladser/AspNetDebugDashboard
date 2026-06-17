@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { api, type MailSummary, type MailDetail } from './api';
+import { api, basePath, type MailSummary, type MailDetail } from './api';
 import { fmtBytes, fmtTime, timeAgo } from './format';
+import SuiteShell from './SuiteShell';
 
 const POLL_MS = 4000;
 
@@ -36,6 +37,7 @@ export default function App() {
   };
 
   return (
+    <SuiteShell current={basePath}>
     <div className="main" style={{ height: '100vh' }}>
       <div className="topbar">
         <h1>Mailbox</h1>
@@ -93,6 +95,7 @@ export default function App() {
 
       {openId && <Detail id={openId} onClose={() => setOpenId(null)} />}
     </div>
+    </SuiteShell>
   );
 }
 

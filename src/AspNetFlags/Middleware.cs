@@ -39,7 +39,8 @@ internal sealed class FlagsMiddleware
             var html = LoadHtml();
             if (html == null) { ctx.Response.StatusCode = 404; return; }
             ctx.Response.ContentType = "text/html; charset=utf-8";
-            await ctx.Response.WriteAsync(html.Replace("%BASE_PATH%", basePath));
+            var nav = AspNetDebugDashboard.Suite.SuiteNav.BuildJson(ctx.RequestServices, basePath);
+            await ctx.Response.WriteAsync(html.Replace("%BASE_PATH%", basePath).Replace("%SUITE_NAV%", nav));
             return;
         }
 

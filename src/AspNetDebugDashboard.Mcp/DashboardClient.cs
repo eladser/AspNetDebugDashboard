@@ -7,31 +7,42 @@ namespace AspNetDebugDashboard.Mcp;
 public sealed class DashboardClient
 {
     private readonly HttpClient _http;
+    private readonly string _baseUrl;
     private readonly string _apiBase;
 
     public DashboardClient(HttpClient http, string baseUrl)
     {
         _http = http;
         _http.Timeout = TimeSpan.FromSeconds(10);
-        _apiBase = $"{baseUrl.TrimEnd('/')}/_debug/api";
+        _baseUrl = baseUrl.TrimEnd('/');
+        _apiBase = $"{_baseUrl}/_debug/api";
     }
 
-    public async Task<string> GetAsync(string pathAndQuery, CancellationToken ct)
+    // dashboard endpoints under /_debug/api
+    public Task<string> GetAsync(string pathAndQuery, CancellationToken ct)
+        => GetAtAsync($"{_apiBase}{pathAndQuery}", ct);
+
+    // any suite-tool endpoint, e.g. "/_flags/api/flags" or "/_vitals/api/vitals"
+    public Task<string> GetSuiteAsync(string pathAndQuery, CancellationToken ct)
+        => GetAtAsync($"{_baseUrl}{pathAndQuery}", ct);
+
+    private async Task<string> GetAtAsync(string url, CancellationToken ct)
     {
         try
         {
-            var res = await _http.GetAsync($"{_apiBase}{pathAndQuery}", ct);
+            var res = await _http.GetAsync(url, ct);
             var body = await res.Content.ReadAsStringAsync(ct);
             if (!res.IsSuccessStatusCode)
             {
-                return Error($"dashboard returned {(int)res.StatusCode}", path: pathAndQuery);
+                return Error($"{(int)res.StatusCode} from {url}",
+                    hint: "that tool may not be installed or the route differs");
             }
             return body;
         }
         catch (Exception ex)
         {
             return Error(
-                $"could not reach the dashboard at {_apiBase}: {ex.Message}",
+                $"could not reach {url}: {ex.Message}",
                 hint: "make sure the app is running and DEBUG_DASHBOARD_URL points at it");
         }
     }

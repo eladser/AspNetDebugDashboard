@@ -4,6 +4,7 @@ using AspNetDebugDashboard.Storage;
 using AspNetDebugDashboard.Interceptors;
 using AspNetDebugDashboard.Web.Hubs;
 using AspNetDebugDashboard.Services;
+using AspNetDebugDashboard.Suite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.EntityFrameworkCore;
@@ -15,6 +16,8 @@ namespace AspNetDebugDashboard.Extensions;
 
 public static class ServiceCollectionExtensions
 {
+    private const string DashboardIcon = "<svg width=\"15\" height=\"15\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"><rect x=\"2\" y=\"2\" width=\"5\" height=\"5\" rx=\"1\"/><rect x=\"9\" y=\"2\" width=\"5\" height=\"5\" rx=\"1\"/><rect x=\"2\" y=\"9\" width=\"5\" height=\"5\" rx=\"1\"/><rect x=\"9\" y=\"9\" width=\"5\" height=\"5\" rx=\"1\"/></svg>";
+
     public static IServiceCollection AddDebugDashboard(this IServiceCollection services, Action<DebugConfiguration>? configure = null)
     {
         var config = new DebugConfiguration();
@@ -50,6 +53,9 @@ public static class ServiceCollectionExtensions
             options.MaxDatabaseSize = config.MaxDatabaseSize;
         });
         
+        // Advertise the dashboard to the shared suite sidebar (first slot)
+        services.AddSuitePanel(new Suite.SuitePanel("Dashboard", config.BasePath, DashboardIcon, 0));
+
         // Register core services
         services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
         services.AddSingleton<DebugContext>();

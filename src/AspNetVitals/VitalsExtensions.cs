@@ -1,3 +1,4 @@
+using AspNetDebugDashboard.Suite;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,6 +9,8 @@ namespace AspNetVitals;
 
 public static class VitalsExtensions
 {
+    private const string Icon = "<svg width=\"15\" height=\"15\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M1.5 8h3l2-4.5L10 12l2-4h2.5\"/></svg>";
+
     public static IServiceCollection AddVitals(this IServiceCollection services, Action<VitalsOptions>? configure = null)
     {
         var options = new VitalsOptions();
@@ -19,6 +22,7 @@ public static class VitalsExtensions
             sp.GetRequiredService<IHostEnvironment>(),
             options,
             sp.GetService<HealthCheckService>()));
+        services.AddSuitePanel(new SuitePanel("Vitals", options.BasePath, Icon, 40));
 
         return services;
     }
