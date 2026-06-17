@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <PackageId>AspNetDebugDashboard.Suite</PackageId>
     <Title>ASP.NET Debug Dashboard Suite</Title>
-    <Version>0.1.0</Version>
+    <Version>1.0.0</Version>
     <Description>Shared contract for the AspNet* dev-tool suite: lets each tool advertise itself so the others render a common navigation sidebar. A small dependency of AspNetMailbox/Flags/Jobs/Vitals and the dashboard; you don't reference it directly.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>

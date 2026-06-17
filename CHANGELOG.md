@@ -4,15 +4,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Version
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-06-17
+
+The dashboard becomes the hub of a tool suite. Existing setup is unchanged: `AddDebugDashboard`/`UseDebugDashboard`, routes, and options are the same, so upgrading from 2.1.x needs no code changes.
+
 ### Added
 - A suite of sibling packages that share the dashboard's recipe (install, get a `/_*` page, no extra infrastructure) and a common navigation sidebar:
-  - `AspNetMailbox`: captures outbound email in-process and previews it at `/_mailbox` (HTML/text/headers/raw/attachments, light or dark preview, `.eml` download). In-process SMTP sink on port 2525.
-  - `AspNetFlags`: feature flags with a toggle UI at `/_flags`. Flags auto-discover when code checks them; add, delete, and filter from the page.
-  - `AspNetJobs`: in-process background jobs with a live inspector at `/_jobs` (status, timing, stack traces, status filter, search, per-status counts).
-  - `AspNetVitals`: live process vitals at `/_vitals` (memory sparkline, CPU, GC, threads, uptime, runtime detail) plus any registered health checks.
-- Shared sidebar across the dashboard and every installed tool, so you can move between them. A tool installed on its own shows no sidebar.
+  - `AspNetMailbox` (0.1.0): captures outbound email in-process and previews it at `/_mailbox` (HTML/text/headers/raw/attachments, light or dark preview, `.eml` download). In-process SMTP sink on port 2525.
+  - `AspNetFlags` (0.1.0): feature flags with a toggle UI at `/_flags`. Flags auto-discover when code checks them; add, delete, and filter from the page.
+  - `AspNetJobs` (0.1.0): in-process background jobs with a live inspector at `/_jobs` (status, timing, stack traces, status filter, search, per-status counts).
+  - `AspNetVitals` (0.1.0): live process vitals at `/_vitals` (memory sparkline, CPU, GC, threads, uptime, runtime detail) plus any registered health checks.
+- Shared sidebar across the dashboard and every installed tool, so you can move between them. A tool installed on its own shows no sidebar. Backed by a small `AspNetDebugDashboard.Suite` (1.0.0) contract package.
 - `AspNetDebugDashboard.Mcp` 2.2.0 adds `list_feature_flags`, `recent_jobs`, `app_vitals`, and `recent_mail` so an agent can read the rest of the suite.
-- NuGet version and download badges for the `AspNetDebugDashboard.Mcp` package, in the main README and the package's own README. (Already on GitHub; reaches the NuGet listings with the next release.)
+- NuGet version and download badges for the `AspNetDebugDashboard.Mcp` package, in the main README and the package's own README.
+
+### Changed
+- Packages are now source-linked and deterministic, and ship `.snupkg` symbol packages, so you can step into the source from a stack trace.
+- Accessibility: every page honors `prefers-reduced-motion`, has a favicon, and labels its icon-only controls.
 
 ## [2.1.1] - 2026-06-14
 

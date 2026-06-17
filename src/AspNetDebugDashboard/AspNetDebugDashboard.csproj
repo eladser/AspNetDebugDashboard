@@ -6,9 +6,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <PackageId>AspNetDebugDashboard</PackageId>
     <Title>ASP.NET Debug Dashboard</Title>
-    <Version>2.1.1</Version>
-    <AssemblyVersion>2.1.1</AssemblyVersion>
-    <FileVersion>2.1.1</FileVersion>
+    <Version>2.2.0</Version>
+    <AssemblyVersion>2.2.0</AssemblyVersion>
+    <FileVersion>2.2.0</FileVersion>
     <Authors>Elad Sertshuk</Authors>
     <Description>Request, SQL query, log, and exception capture for ASP.NET Core, viewable in a dashboard served at /_debug. Inspired by Laravel Telescope. LiteDB storage, EF Core interceptor, zero-config setup.</Description>
     <PackageProjectUrl>https://github.com/eladser/AspNetDebugDashboard</PackageProjectUrl>
