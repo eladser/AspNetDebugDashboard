@@ -9,6 +9,7 @@
     <Version>0.1.0</Version>
     <Description>Shared contract for the AspNet* dev-tool suite: lets each tool advertise itself so the others render a common navigation sidebar. A small dependency of AspNetMailbox/Flags/Jobs/Vitals and the dashboard; you don't reference it directly.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
     <PackageTags>aspnetcore;developer-tools;internal</PackageTags>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
@@ -19,6 +20,7 @@
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="icon.png" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>
