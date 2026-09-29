@@ -10,9 +10,25 @@ public class DebugConfiguration
     public bool LogResponseBodies { get; set; } = false;
     public bool LogSqlQueries { get; set; } = true;
     public bool LogExceptions { get; set; } = true;
+    [Obsolete("Has no effect. The dashboard polls the API.")]
     public bool EnableRealTimeUpdates { get; set; } = true;
     public List<string> ExcludedPaths { get; set; } = new() { "/_debug", "/favicon.ico", "/robots.txt" };
-    public List<string> ExcludedHeaders { get; set; } = new() { "Authorization", "Cookie" };
+    public List<string> ExcludedHeaders { get; set; } = new()
+    {
+        "Authorization", "Cookie", "Set-Cookie", "X-Api-Key", "X-Auth-Token", "Proxy-Authorization"
+    };
+
+    // Body field names (case-insensitive substring match) redacted to "***" before storage.
+    public List<string> RedactedBodyFields { get; set; } = new() { "password", "secret", "token", "apikey" };
+
+    // Environments the dashboard responds in, checked against IHostEnvironment.EnvironmentName.
+    // Use "*" to allow every environment. Everything (UI, API, EF interceptor) goes through this.
+    public List<string> AllowedEnvironments { get; set; } = new() { "Development" };
+
+    // Extra gate on top of IsEnabled/AllowedEnvironments, applied to every dashboard UI and API
+    // request. Return false to reject with 401. Null (default) means no extra check.
+    public Func<Microsoft.AspNetCore.Http.HttpContext, bool>? AuthorizationFilter { get; set; }
+
     public int MaxBodySize { get; set; } = 1024 * 1024; // 1MB
     public TimeSpan RetentionPeriod { get; set; } = TimeSpan.FromDays(7);
     public bool EnablePerformanceCounters { get; set; } = true;

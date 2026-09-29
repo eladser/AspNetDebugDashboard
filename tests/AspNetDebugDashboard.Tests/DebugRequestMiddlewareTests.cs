@@ -263,6 +263,81 @@ public class DebugRequestMiddlewareTests
         )), Times.Once);
     }
 
+    [Fact]
+    public async Task InvokeAsync_WithPasswordField_RedactsValue()
+    {
+        // Arrange
+        var middleware = new DebugRequestMiddleware(_mockNext.Object, _mockOptions.Object, _mockStorage.Object, new DebugContext());
+        var context = CreateHttpContext();
+
+        var requestBody = "{\"username\": \"bob\", \"password\": \"hunter2\"}";
+        var requestBytes = Encoding.UTF8.GetBytes(requestBody);
+        context.Request.Body = new MemoryStream(requestBytes);
+        context.Request.ContentLength = requestBytes.Length;
+        context.Request.ContentType = "application/json";
+
+        _mockNext.Setup(x => x(context)).Returns(Task.CompletedTask);
+        _mockStorage.Setup(x => x.StoreRequestAsync(It.IsAny<RequestEntry>()))
+                   .ReturnsAsync("test-id");
+
+        // Act
+        await middleware.InvokeAsync(context);
+
+        // Assert
+        _mockStorage.Verify(x => x.StoreRequestAsync(It.Is<RequestEntry>(r =>
+            r.RequestBody != null &&
+            r.RequestBody.Contains("\"username\":\"bob\"") &&
+            r.RequestBody.Contains("\"password\":\"***\"")
+        )), Times.Once);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_WithFormPasswordField_RedactsValue()
+    {
+        var middleware = new DebugRequestMiddleware(_mockNext.Object, _mockOptions.Object, _mockStorage.Object, new DebugContext());
+        var context = CreateHttpContext();
+
+        var requestBytes = Encoding.UTF8.GetBytes("username=bob&Password=hunter2&remember=true");
+        context.Request.Body = new MemoryStream(requestBytes);
+        context.Request.ContentLength = requestBytes.Length;
+        context.Request.ContentType = "application/x-www-form-urlencoded";
+
+        _mockNext.Setup(x => x(context)).Returns(Task.CompletedTask);
+        _mockStorage.Setup(x => x.StoreRequestAsync(It.IsAny<RequestEntry>()))
+                   .ReturnsAsync("test-id");
+
+        await middleware.InvokeAsync(context);
+
+        _mockStorage.Verify(x => x.StoreRequestAsync(It.Is<RequestEntry>(r =>
+            r.RequestBody == "username=bob&Password=***&remember=true"
+        )), Times.Once);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_WithDefaultExcludedHeaders_FiltersApiKeyAndSetCookie()
+    {
+        // Arrange
+        _config.ExcludedHeaders = new DebugConfiguration().ExcludedHeaders;
+        var middleware = new DebugRequestMiddleware(_mockNext.Object, _mockOptions.Object, _mockStorage.Object, new DebugContext());
+        var context = CreateHttpContext();
+
+        context.Request.Headers["X-Api-Key"] = "secret-key";
+        context.Request.Headers["Content-Type"] = "application/json";
+
+        _mockNext.Setup(x => x(context)).Returns(Task.CompletedTask);
+        _mockStorage.Setup(x => x.StoreRequestAsync(It.IsAny<RequestEntry>()))
+                   .ReturnsAsync("test-id");
+
+        // Act
+        await middleware.InvokeAsync(context);
+
+        // Assert
+        _mockStorage.Verify(x => x.StoreRequestAsync(It.Is<RequestEntry>(r =>
+            !r.Headers.ContainsKey("X-Api-Key") &&
+            r.Headers.ContainsKey("Content-Type")
+        )), Times.Once);
+    }
+
     private static HttpContext CreateHttpContext()
     {
         var context = new DefaultHttpContext();

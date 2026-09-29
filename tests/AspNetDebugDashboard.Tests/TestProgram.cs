@@ -1,11 +1,12 @@
 using AspNetDebugDashboard.Extensions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
+// No EnvironmentName here on purpose: WebApplicationFactory.WithWebHostBuilder(b => b.UseEnvironment(...))
+// only has an effect if the entry point doesn't hardcode it first.
 var options = new WebApplicationOptions
 {
     Args = args,
     ContentRootPath = Directory.GetCurrentDirectory(),
-    EnvironmentName = "Development"
 };
 
 var builder = WebApplication.CreateBuilder(options);

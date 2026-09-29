@@ -1,6 +1,8 @@
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using AspNetDebugDashboard.Core.Models;
+using AspNetDebugDashboard.Core.Services;
 using System.Reflection;
 
 namespace AspNetDebugDashboard.Web.Controllers;
@@ -8,6 +10,7 @@ namespace AspNetDebugDashboard.Web.Controllers;
 public class DebugHomeController : Controller
 {
     private readonly DebugConfiguration _config;
+    private readonly IWebHostEnvironment? _env;
 
     // The dashboard is a single self-contained HTML file built from /dashboard
     // and embedded in the assembly. Cached after the first read; only the
@@ -17,10 +20,11 @@ public class DebugHomeController : Controller
 
     private readonly IServiceProvider _services;
 
-    public DebugHomeController(IOptions<DebugConfiguration> config, IServiceProvider services)
+    public DebugHomeController(IOptions<DebugConfiguration> config, IServiceProvider services, IWebHostEnvironment? env = null)
     {
         _config = config.Value;
         _services = services;
+        _env = env;
     }
 
     [HttpGet("/_debug")]
@@ -29,12 +33,17 @@ public class DebugHomeController : Controller
     [HttpGet("/_custom-debug/{*path}")]
     public IActionResult Index()
     {
-        if (!_config.IsEnabled) return NotFound();
+        if (_env != null && !DebugDashboardAccess.IsActive(_config, _env)) return NotFound();
+        if (_env == null && !_config.IsEnabled) return NotFound();
 
-        if (HttpContext?.Request?.Path.Value is { } requestPath &&
-            !requestPath.StartsWith(_config.BasePath))
+        if (HttpContext != null && !HttpContext.Items.ContainsKey(DebugDashboardAccess.BasePathMatchedItemKey))
         {
             return NotFound();
+        }
+
+        if (_config.AuthorizationFilter != null && HttpContext != null && !_config.AuthorizationFilter(HttpContext))
+        {
+            return Unauthorized();
         }
 
         var html = LoadHtml();

@@ -2,6 +2,8 @@ using AspNetDebugDashboard.Core.Models;
 using AspNetDebugDashboard.Web.Controllers;
 using AspNetDebugDashboard.Core.Services;
 using FluentAssertions;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -15,6 +17,7 @@ public class DebugApiControllerTests
 {
     private readonly Mock<IDebugStorage> _mockStorage;
     private readonly Mock<IOptions<DebugConfiguration>> _mockOptions;
+    private readonly Mock<IWebHostEnvironment> _mockEnv;
     private readonly DebugApiController _controller;
     private readonly Fixture _fixture;
 
@@ -22,25 +25,86 @@ public class DebugApiControllerTests
     {
         _mockStorage = new Mock<IDebugStorage>();
         _mockOptions = new Mock<IOptions<DebugConfiguration>>();
+        _mockEnv = new Mock<IWebHostEnvironment>();
+        _mockEnv.Setup(x => x.EnvironmentName).Returns("Development");
         _fixture = new Fixture();
-        
+
         // Fix circular reference issue with AutoFixture
         _fixture.Behaviors.OfType<ThrowingRecursionBehavior>().ToList()
             .ForEach(b => _fixture.Behaviors.Remove(b));
         _fixture.Behaviors.Add(new OmitOnRecursionBehavior());
-        
+
         // Customize ExceptionEntry to avoid circular references
         _fixture.Customize<ExceptionEntry>(c => c
             .Without(x => x.InnerException));
-            
+
         // Customize PagedResult to avoid issues
         _fixture.Customize<PagedResult<ExceptionEntry>>(c => c
             .With(x => x.Items, new List<ExceptionEntry>()));
-        
+
         var config = new DebugConfiguration { IsEnabled = true };
         _mockOptions.Setup(x => x.Value).Returns(config);
-        
-        _controller = new DebugApiController(_mockStorage.Object, _mockOptions.Object);
+
+        _controller = new DebugApiController(_mockStorage.Object, _mockOptions.Object, _mockEnv.Object);
+    }
+
+    [Fact]
+    public async Task GetStats_InProduction_ReturnsNotFound()
+    {
+        // Arrange: default AllowedEnvironments is Development-only
+        var config = new DebugConfiguration { IsEnabled = true };
+        _mockOptions.Setup(x => x.Value).Returns(config);
+        var prodEnv = new Mock<IWebHostEnvironment>();
+        prodEnv.Setup(x => x.EnvironmentName).Returns("Production");
+        var controller = new DebugApiController(_mockStorage.Object, _mockOptions.Object, prodEnv.Object);
+
+        // Act
+        var result = await controller.GetStats();
+
+        // Assert
+        result.Result.Should().BeOfType<NotFoundResult>();
+        _mockStorage.Verify(x => x.GetStatsAsync(), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetStats_InProductionWithAllowedEnvironments_Works()
+    {
+        // Arrange
+        var config = new DebugConfiguration { IsEnabled = true, AllowedEnvironments = new() { "Production" } };
+        _mockOptions.Setup(x => x.Value).Returns(config);
+        var prodEnv = new Mock<IWebHostEnvironment>();
+        prodEnv.Setup(x => x.EnvironmentName).Returns("Production");
+        var controller = new DebugApiController(_mockStorage.Object, _mockOptions.Object, prodEnv.Object);
+        _mockStorage.Setup(x => x.GetStatsAsync()).ReturnsAsync(_fixture.Create<DebugStats>());
+
+        // Act
+        var result = await controller.GetStats();
+
+        // Assert
+        result.Result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetStats_WithAuthorizationFilterDenying_ReturnsUnauthorized()
+    {
+        // Arrange
+        var config = new DebugConfiguration
+        {
+            IsEnabled = true,
+            AuthorizationFilter = _ => false
+        };
+        _mockOptions.Setup(x => x.Value).Returns(config);
+        var controller = new DebugApiController(_mockStorage.Object, _mockOptions.Object, _mockEnv.Object)
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+        };
+        controller.HttpContext.Items[DebugDashboardAccess.BasePathMatchedItemKey] = true;
+
+        // Act
+        var result = await controller.GetStats();
+
+        // Assert
+        result.Result.Should().BeOfType<UnauthorizedResult>();
     }
 
     [Fact]
