@@ -31,9 +31,8 @@ builder.Services.AddDebugDashboard(config =>
     "LogResponseBodies": false,
     "LogSqlQueries": true,
     "LogExceptions": true,
-    "EnableRealTimeUpdates": true,
     "ExcludedPaths": ["/_debug", "/favicon.ico", "/robots.txt"],
-    "ExcludedHeaders": ["Authorization", "Cookie"],
+    "ExcludedHeaders": ["Authorization", "Cookie", "Set-Cookie", "X-Api-Key", "X-Auth-Token", "Proxy-Authorization"],
     "MaxBodySize": 1048576,
     "RetentionPeriod": "7.00:00:00",
     "EnablePerformanceCounters": true,
@@ -97,7 +96,10 @@ builder.Services.AddDebugDashboard();
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `ExcludedPaths` | `List<string>` | `["/_debug", "/favicon.ico", "/robots.txt"]` | Paths to exclude from logging |
-| `ExcludedHeaders` | `List<string>` | `["Authorization", "Cookie"]` | Headers to exclude from logging |
+| `ExcludedHeaders` | `List<string>` | `["Authorization", "Cookie", "Set-Cookie", "X-Api-Key", "X-Auth-Token", "Proxy-Authorization"]` | Headers to exclude from logging |
+| `RedactedBodyFields` | `List<string>` | `["password", "secret", "token", "apikey"]` | JSON and form field names whose values are stored as `***` (case-insensitive, substring match) |
+| `AllowedEnvironments` | `List<string>` | `["Development"]` | Environments where the UI, API and EF capture run. `"*"` allows all |
+| `AuthorizationFilter` | `Func<HttpContext, bool>?` | `null` | Checked on every UI and API request; returning false gives a 401. Code only, not bindable from appsettings |
 | `AllowDataExport` | `bool` | `true` | Allow exporting debug data |
 | `AllowDataImport` | `bool` | `false` | Allow importing debug data |
 
@@ -106,7 +108,6 @@ builder.Services.AddDebugDashboard();
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `RetentionPeriod` | `TimeSpan` | `7 days` | How long to keep debug data |
-| `EnableRealTimeUpdates` | `bool` | `true` | Enable real-time dashboard updates |
 | `TimeZone` | `string` | `"UTC"` | Time zone for displaying timestamps |
 
 ### Telemetry Settings

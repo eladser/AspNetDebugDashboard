@@ -307,6 +307,112 @@ public class DebugDashboardIntegrationTests : IClassFixture<TestWebApplicationFa
     }
 
     [Fact]
+    public async Task Dashboard_EnabledInProduction_StillReturnsNotFound()
+    {
+        // Arrange: IsEnabled=true but AllowedEnvironments defaults to Development-only.
+        // MapControllers() runs regardless of whether UseDebugDashboard() ever adds
+        // anything to the pipeline (it's a no-op outside the allowed environments), so this
+        // is the exact scenario the controllers themselves need to reject.
+        var factory = _factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Production");
+            builder.ConfigureServices(services =>
+            {
+                services.Configure<HealthCheckServiceOptions>(options =>
+                {
+                    options.Registrations.Clear();
+                });
+
+                services.AddDebugDashboard(options =>
+                {
+                    options.IsEnabled = true;
+                    options.DatabasePath = $":memory:{Guid.NewGuid()}";
+                });
+            });
+        });
+
+        var client = factory.CreateClient();
+
+        // Act
+        var homeResponse = await client.GetAsync("/_debug");
+        var apiResponse = await client.GetAsync("/_debug/api/stats");
+        var exportResponse = await client.GetAsync("/_debug/api/export");
+        var clearResponse = await client.DeleteAsync("/_debug/api/clear");
+
+        // Assert
+        homeResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        apiResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        exportResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        clearResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Dashboard_WithAuthorizationFilterDenying_ReturnsUnauthorized()
+    {
+        // Arrange
+        var factory = _factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureServices(services =>
+            {
+                services.Configure<HealthCheckServiceOptions>(options =>
+                {
+                    options.Registrations.Clear();
+                });
+
+                services.AddDebugDashboard(options =>
+                {
+                    options.IsEnabled = true;
+                    options.DatabasePath = $":memory:{Guid.NewGuid()}";
+                    options.AuthorizationFilter = _ => false;
+                });
+            });
+        });
+
+        var client = factory.CreateClient();
+
+        // Act
+        var homeResponse = await client.GetAsync("/_debug");
+        var apiResponse = await client.GetAsync("/_debug/api/stats");
+
+        // Assert
+        homeResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        apiResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Dashboard_WithArbitraryCustomBasePath_Works()
+    {
+        // Arrange: a BasePath that isn't the hardcoded "/_debug" or "/_custom-debug"
+        var factory = _factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureServices(services =>
+            {
+                services.Configure<HealthCheckServiceOptions>(options =>
+                {
+                    options.Registrations.Clear();
+                });
+
+                services.AddDebugDashboard(options =>
+                {
+                    options.IsEnabled = true;
+                    options.BasePath = "/_something-else";
+                    options.DatabasePath = $":memory:{Guid.NewGuid()}";
+                });
+            });
+        });
+
+        var client = factory.CreateClient();
+
+        // Act
+        var homeResponse = await client.GetAsync("/_something-else");
+        var apiResponse = await client.GetAsync("/_something-else/api/stats");
+
+        // Assert
+        homeResponse.EnsureSuccessStatusCode();
+        apiResponse.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
     public async Task Dashboard_WithCustomPath_Works()
     {
         // Arrange

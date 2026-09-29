@@ -2,7 +2,21 @@
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [2.3.0] - 2026-09-30
+
+### Security
+- The UI, API, and EF interceptor now check `IsEnabled` and the environment against a new `AllowedEnvironments` option (default: `Development` only) themselves, instead of relying only on `UseDebugDashboard()` being called correctly. Requests outside an allowed environment get a 404 even when `MapControllers()` is registered unconditionally.
+- Added an optional `AuthorizationFilter` (`Func<HttpContext, bool>`) applied to every dashboard UI and API request; returns 401 when it rejects the request.
+- Default `ExcludedHeaders` now also covers `Set-Cookie`, `X-Api-Key`, `X-Auth-Token`, and `Proxy-Authorization`.
+- Added `RedactedBodyFields` (default: `password`, `secret`, `token`, `apikey`): matching field names in captured JSON and form-urlencoded bodies are replaced with `***` before storage.
+
+### Fixed
+- `EmitActivities = false` was silently ignored; the option is now carried over by `AddDebugDashboard`.
+- A custom `BasePath` other than `/_debug` or `/_custom-debug` 404'd on every route; requests are now rewritten onto the canonical route internally so any `BasePath` works.
+
+### Changed
+- Removed the unused SignalR hub. `EnableRealTimeUpdates` and `AddDebugDashboardSignalR()` are marked obsolete and do nothing; the UI polls the API.
+- Bumped EF Core to 8.0.31/9.0.20/10.0.12 (per-TFM), MimeKit to 4.18.1 (AspNetMailbox 0.1.1), ModelContextProtocol to 1.4.1, Microsoft.SourceLink.GitHub to 10.0.401, and vite to 8.3.1 across the dashboard and suite UIs.
 
 ## [2.2.0] - 2026-06-17
 

@@ -2,6 +2,7 @@ using AspNetDebugDashboard.Core.Models;
 using AspNetDebugDashboard.Core.Services;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using System.Data.Common;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Http;
@@ -97,7 +98,10 @@ public class DebugCommandInterceptor : DbCommandInterceptor
     private SqlQueryEntry? BuildEntry(DbCommand command, TimeSpan duration, bool success, string? error, int? rowsAffected)
     {
         var config = _serviceProvider.GetService<IOptions<DebugConfiguration>>()?.Value;
-        if (config is not { IsEnabled: true, LogSqlQueries: true }) return null;
+        if (config is not { LogSqlQueries: true }) return null;
+
+        var env = _serviceProvider.GetService<IWebHostEnvironment>();
+        if (env == null || !DebugDashboardAccess.IsActive(config, env)) return null;
 
         var httpContextAccessor = _serviceProvider.GetService<IHttpContextAccessor>();
         var requestId = httpContextAccessor?.HttpContext?.TraceIdentifier;

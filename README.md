@@ -142,7 +142,10 @@ builder.Services.AddDebugDashboard(options =>
     options.MaxBodySize = 1024 * 1024;         // bodies above this are skipped
     options.SlowQueryThresholdMs = 1000;
     options.ExcludedPaths = new() { "/_debug", "/health" };
-    options.ExcludedHeaders = new() { "Authorization", "Cookie" };
+    options.ExcludedHeaders = new() { "Authorization", "Cookie", "Set-Cookie", "X-Api-Key", "X-Auth-Token", "Proxy-Authorization" };
+    options.RedactedBodyFields = new() { "password", "secret", "token", "apikey" }; // matched case-insensitively against JSON and form field names
+    options.AllowedEnvironments = new() { "Development" }; // "*" allows every environment
+    options.AuthorizationFilter = null;        // Func<HttpContext, bool>, applied to UI + API
     options.RetentionPeriod = TimeSpan.FromDays(7);
 });
 ```
@@ -205,13 +208,26 @@ Setup and the full tool list are in its [README](src/AspNetDebugDashboard.Mcp/RE
 
 ## Production
 
-`UseDebugDashboard()` does nothing unless the environment is Development, so leaving the package referenced in production builds is safe. If you do want it on elsewhere (a staging box, say), opt in explicitly:
+The dashboard's UI, API, and EF interceptor all check `IsEnabled` and the current environment against `AllowedEnvironments` (default: `Development` only) before doing anything, and they check it themselves rather than relying on `UseDebugDashboard()` being called a particular way. That holds even if `MapControllers()` is registered unconditionally, so requests outside an allowed environment get a 404 regardless of how the pipeline is wired.
+
+If you want it on elsewhere (a staging box, say), opt in explicitly:
 
 ```csharp
 app.UseDebugDashboard(forceEnable: true);
 ```
 
-If you force-enable it anywhere reachable from the internet, put it behind your own auth. The dashboard itself has none, and captured request bodies can contain anything your users send.
+This enables the dashboard and adds the current environment to `AllowedEnvironments`. You can also set `AllowedEnvironments` directly in `AddDebugDashboard`, or use `"*"` to allow every environment.
+
+If you enable it anywhere reachable from the internet, set `AuthorizationFilter` too:
+
+```csharp
+services.AddDebugDashboard(options =>
+{
+    options.AuthorizationFilter = ctx => ctx.User.IsInRole("Admin");
+});
+```
+
+It runs on every dashboard UI and API request and returns 401 when it returns false. Without it, the dashboard has no auth of its own, and captured request bodies can contain anything your users send (though known password/secret/token/apikey fields are redacted by default; see `RedactedBodyFields`).
 
 ## REST API
 

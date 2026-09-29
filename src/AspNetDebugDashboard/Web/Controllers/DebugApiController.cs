@@ -1,5 +1,6 @@
 using AspNetDebugDashboard.Core.Models;
 using AspNetDebugDashboard.Core.Services;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
@@ -11,32 +12,43 @@ public class DebugApiController : ControllerBase
 {
     private readonly IDebugStorage _storage;
     private readonly DebugConfiguration _config;
+    private readonly IWebHostEnvironment? _env;
 
-    public DebugApiController(IDebugStorage storage, IOptions<DebugConfiguration> config)
+    public DebugApiController(IDebugStorage storage, IOptions<DebugConfiguration> config, IWebHostEnvironment? env = null)
     {
         _storage = storage ?? throw new ArgumentNullException(nameof(storage));
         _config = config?.Value ?? throw new ArgumentNullException(nameof(config));
+        _env = env;
     }
 
-    private bool IsValidPath()
+    // NotFound() when the dashboard isn't active or the request came in on the wrong path,
+    // Unauthorized() when an AuthorizationFilter is configured and rejects the request.
+    private ActionResult? CheckAccess()
     {
-        if (!_config.IsEnabled) return false;
-        
+        // _env is only null in unit tests that construct the controller directly; those don't
+        // go through the pipeline so there's no environment to gate on.
+        if (_env != null && !DebugDashboardAccess.IsActive(_config, _env)) return NotFound();
+        if (_env == null && !_config.IsEnabled) return NotFound();
+
         // Only validate path if we have an HttpContext (skip for unit tests)
-        if (HttpContext?.Request?.Path.Value != null)
+        if (HttpContext != null && !HttpContext.Items.ContainsKey(DebugDashboardAccess.BasePathMatchedItemKey))
         {
-            var requestPath = HttpContext.Request.Path.Value;
-            return requestPath.StartsWith(_config.BasePath);
+            return NotFound();
         }
-        
-        return true; // Allow for unit tests where HttpContext is null
+
+        if (_config.AuthorizationFilter != null && HttpContext != null && !_config.AuthorizationFilter(HttpContext))
+        {
+            return Unauthorized();
+        }
+
+        return null;
     }
 
     [HttpGet("/_debug/api/stats")]
     [HttpGet("/_custom-debug/api/stats")]
     public async Task<ActionResult<DebugStats>> GetStats()
     {
-        if (!IsValidPath()) return NotFound();
+        if (CheckAccess() is { } deny) return deny;
         
         var stats = await _storage.GetStatsAsync();
         return Ok(stats);
@@ -46,7 +58,7 @@ public class DebugApiController : ControllerBase
     [HttpGet("/_custom-debug/api/requests")]
     public async Task<ActionResult<PagedResult<RequestEntry>>> GetRequests([FromQuery] DebugFilter filter)
     {
-        if (!IsValidPath()) return NotFound();
+        if (CheckAccess() is { } deny) return deny;
         
         var requests = await _storage.GetRequestsAsync(filter);
         return Ok(requests);
@@ -56,7 +68,7 @@ public class DebugApiController : ControllerBase
     [HttpGet("/_custom-debug/api/requests/{id}")]
     public async Task<ActionResult<RequestEntry>> GetRequest(string id)
     {
-        if (!IsValidPath()) return NotFound();
+        if (CheckAccess() is { } deny) return deny;
         
         var request = await _storage.GetRequestAsync(id);
         if (request == null) return NotFound();
@@ -68,7 +80,7 @@ public class DebugApiController : ControllerBase
     [HttpGet("/_custom-debug/api/queries")]
     public async Task<ActionResult<PagedResult<SqlQueryEntry>>> GetQueries([FromQuery] DebugFilter filter)
     {
-        if (!IsValidPath()) return NotFound();
+        if (CheckAccess() is { } deny) return deny;
         
         var queries = await _storage.GetSqlQueriesAsync(filter);
         return Ok(queries);
@@ -78,7 +90,7 @@ public class DebugApiController : ControllerBase
     [HttpGet("/_custom-debug/api/queries/{id}")]
     public async Task<ActionResult<SqlQueryEntry>> GetQuery(string id)
     {
-        if (!IsValidPath()) return NotFound();
+        if (CheckAccess() is { } deny) return deny;
         
         var query = await _storage.GetSqlQueryAsync(id);
         if (query == null) return NotFound();
@@ -90,7 +102,7 @@ public class DebugApiController : ControllerBase
     [HttpGet("/_custom-debug/api/logs")]
     public async Task<ActionResult<PagedResult<LogEntry>>> GetLogs([FromQuery] DebugFilter filter)
     {
-        if (!IsValidPath()) return NotFound();
+        if (CheckAccess() is { } deny) return deny;
         
         var logs = await _storage.GetLogsAsync(filter);
         return Ok(logs);
@@ -100,7 +112,7 @@ public class DebugApiController : ControllerBase
     [HttpGet("/_custom-debug/api/logs/{id}")]
     public async Task<ActionResult<LogEntry>> GetLog(string id)
     {
-        if (!IsValidPath()) return NotFound();
+        if (CheckAccess() is { } deny) return deny;
         
         var log = await _storage.GetLogAsync(id);
         if (log == null) return NotFound();
@@ -112,7 +124,7 @@ public class DebugApiController : ControllerBase
     [HttpGet("/_custom-debug/api/exceptions")]
     public async Task<ActionResult<PagedResult<ExceptionEntry>>> GetExceptions([FromQuery] DebugFilter filter)
     {
-        if (!IsValidPath()) return NotFound();
+        if (CheckAccess() is { } deny) return deny;
         
         var exceptions = await _storage.GetExceptionsAsync(filter);
         return Ok(exceptions);
@@ -122,7 +134,7 @@ public class DebugApiController : ControllerBase
     [HttpGet("/_custom-debug/api/exceptions/{id}")]
     public async Task<ActionResult<ExceptionEntry>> GetException(string id)
     {
-        if (!IsValidPath()) return NotFound();
+        if (CheckAccess() is { } deny) return deny;
         
         var exception = await _storage.GetExceptionAsync(id);
         if (exception == null) return NotFound();
@@ -134,7 +146,7 @@ public class DebugApiController : ControllerBase
     [HttpPost("/_custom-debug/api/logs")]
     public async Task<ActionResult<string>> CreateLog([FromBody] CreateLogRequest request)
     {
-        if (!IsValidPath()) return NotFound();
+        if (CheckAccess() is { } deny) return deny;
         
         // Add null checks and validation
         if (request == null)
@@ -161,7 +173,7 @@ public class DebugApiController : ControllerBase
     [HttpDelete("/_custom-debug/api/clear")]
     public async Task<ActionResult> ClearAll()
     {
-        if (!IsValidPath()) return NotFound();
+        if (CheckAccess() is { } deny) return deny;
         
         await _storage.ClearAllAsync();
         return Ok(new { message = "All debug data cleared" });
@@ -171,7 +183,7 @@ public class DebugApiController : ControllerBase
     [HttpPost("/_custom-debug/api/cleanup")]
     public async Task<ActionResult> Cleanup()
     {
-        if (!IsValidPath()) return NotFound();
+        if (CheckAccess() is { } deny) return deny;
         
         await _storage.CleanupAsync(_config.MaxEntries);
         return Ok(new { message = "Cleanup completed" });
@@ -181,7 +193,7 @@ public class DebugApiController : ControllerBase
     [HttpGet("/_custom-debug/api/config")]
     public ActionResult<object> GetConfig()
     {
-        if (!IsValidPath()) return NotFound();
+        if (CheckAccess() is { } deny) return deny;
         
         return Ok(new
         {
@@ -190,8 +202,7 @@ public class DebugApiController : ControllerBase
             logRequestBodies = _config.LogRequestBodies,
             logResponseBodies = _config.LogResponseBodies,
             logSqlQueries = _config.LogSqlQueries,
-            logExceptions = _config.LogExceptions,
-            enableRealTimeUpdates = _config.EnableRealTimeUpdates
+            logExceptions = _config.LogExceptions
         });
     }
 
@@ -199,7 +210,7 @@ public class DebugApiController : ControllerBase
     [HttpGet("/_custom-debug/api/export")]
     public async Task<ActionResult> ExportData([FromQuery] string format = "json")
     {
-        if (!IsValidPath()) return NotFound();
+        if (CheckAccess() is { } deny) return deny;
 
         var stats = await _storage.GetStatsAsync();
         var requests = await _storage.GetRequestsAsync(new DebugFilter { PageSize = int.MaxValue });
@@ -231,7 +242,7 @@ public class DebugApiController : ControllerBase
     [HttpGet("/_custom-debug/api/search")]
     public async Task<ActionResult> Search([FromQuery] string term, [FromQuery] string[] types = null!)
     {
-        if (!IsValidPath()) return NotFound();
+        if (CheckAccess() is { } deny) return deny;
         if (string.IsNullOrWhiteSpace(term)) return BadRequest("Search term is required");
 
         var results = new List<object>();
@@ -283,7 +294,7 @@ public class DebugApiController : ControllerBase
     [HttpGet("/_custom-debug/api/performance")]
     public async Task<ActionResult> GetPerformanceMetrics()
     {
-        if (!IsValidPath()) return NotFound();
+        if (CheckAccess() is { } deny) return deny;
 
         var stats = await _storage.GetStatsAsync();
         
@@ -336,7 +347,7 @@ public class DebugApiController : ControllerBase
     [HttpGet("/_custom-debug/api/health")]
     public async Task<ActionResult> GetHealth()
     {
-        if (!IsValidPath()) return NotFound();
+        if (CheckAccess() is { } deny) return deny;
 
         var health = new
         {

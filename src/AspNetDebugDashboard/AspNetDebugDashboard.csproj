@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <PackageId>AspNetDebugDashboard</PackageId>
     <Title>ASP.NET Debug Dashboard</Title>
-    <Version>2.2.0</Version>
+    <Version>2.3.0</Version>
     <AssemblyVersion>2.2.0</AssemblyVersion>
     <FileVersion>2.2.0</FileVersion>
     <Authors>Elad Sertshuk</Authors>
@@ -33,16 +33,16 @@
 
   <!-- EF Core tracks the consumer's runtime so the package doesn't force an upgrade -->
   <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.28" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="8.0.28" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.31" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="8.0.31" />
   </ItemGroup>
   <ItemGroup Condition="'$(TargetFramework)' == 'net9.0'">
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.17" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.17" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.20" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.20" />
   </ItemGroup>
   <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.9" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.9" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.12" />
   </ItemGroup>
 
   <ItemGroup>

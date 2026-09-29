@@ -9,7 +9,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>aspnet-debug-mcp</ToolCommandName>
     <PackageId>AspNetDebugDashboard.Mcp</PackageId>
-    <Version>2.2.0</Version>
+    <Version>2.3.0</Version>
     <Authors>Elad Sertshuk</Authors>
     <Description>MCP server for AspNetDebugDashboard. Lets coding agents query captured requests, SQL queries, logs, exceptions, and performance, plus the rest of the suite: feature flags, background jobs, vitals, and captured mail.</Description>
     <PackageProjectUrl>https://github.com/eladser/AspNetDebugDashboard</PackageProjectUrl>
@@ -22,7 +22,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="ModelContextProtocol" Version="1.4.0" />
+    <PackageReference Include="ModelContextProtocol" Version="1.4.1" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.1" />
   </ItemGroup>

@@ -2,7 +2,6 @@ using AspNetDebugDashboard.Core.Models;
 using AspNetDebugDashboard.Core.Services;
 using AspNetDebugDashboard.Storage;
 using AspNetDebugDashboard.Interceptors;
-using AspNetDebugDashboard.Web.Hubs;
 using AspNetDebugDashboard.Services;
 using AspNetDebugDashboard.Suite;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,9 +32,11 @@ public static class ServiceCollectionExtensions
             options.LogResponseBodies = config.LogResponseBodies;
             options.LogSqlQueries = config.LogSqlQueries;
             options.LogExceptions = config.LogExceptions;
-            options.EnableRealTimeUpdates = config.EnableRealTimeUpdates;
             options.ExcludedPaths = config.ExcludedPaths;
             options.ExcludedHeaders = config.ExcludedHeaders;
+            options.RedactedBodyFields = config.RedactedBodyFields;
+            options.AllowedEnvironments = config.AllowedEnvironments;
+            options.AuthorizationFilter = config.AuthorizationFilter;
             options.MaxBodySize = config.MaxBodySize;
             options.RetentionPeriod = config.RetentionPeriod;
             options.EnablePerformanceCounters = config.EnablePerformanceCounters;
@@ -51,6 +52,7 @@ public static class ServiceCollectionExtensions
             options.EnableCpuProfiling = config.EnableCpuProfiling;
             options.CleanupInterval = config.CleanupInterval;
             options.MaxDatabaseSize = config.MaxDatabaseSize;
+            options.EmitActivities = config.EmitActivities;
         });
         
         // Advertise the dashboard to the shared suite sidebar (first slot)
@@ -67,19 +69,7 @@ public static class ServiceCollectionExtensions
         
         // Register EF Core interceptor
         services.AddSingleton<DebugCommandInterceptor>();
-        
-        // Register SignalR for real-time updates
-        if (config.EnableRealTimeUpdates)
-        {
-            services.AddSignalR();
-            services.AddScoped<IDebugDashboardNotificationService, DebugDashboardNotificationService>();
-        }
-        else
-        {
-            // Register a no-op implementation when real-time updates are disabled
-            services.AddScoped<IDebugDashboardNotificationService, NoOpNotificationService>();
-        }
-        
+
         // Register background services
         if (config.IsEnabled && config.CleanupInterval.HasValue)
         {
@@ -105,32 +95,17 @@ public static class ServiceCollectionExtensions
         return services;
     }
     
-    public static IServiceCollection AddDebugDashboardSignalR(this IServiceCollection services)
-    {
-        services.AddSignalR();
-        services.AddScoped<IDebugDashboardNotificationService, DebugDashboardNotificationService>();
-        return services;
-    }
-    
+    [Obsolete("Has no effect. The dashboard polls the API and no longer uses SignalR.")]
+    public static IServiceCollection AddDebugDashboardSignalR(this IServiceCollection services) => services;
+
     public static IServiceCollection AddDebugDashboardCleanup(this IServiceCollection services, TimeSpan? interval = null)
     {
         services.Configure<DebugConfiguration>(options =>
         {
             options.CleanupInterval = interval ?? TimeSpan.FromHours(1);
         });
-        
+
         services.AddHostedService<DebugDashboardCleanupService>();
         return services;
     }
-}
-
-// No-op implementation for when real-time updates are disabled
-internal class NoOpNotificationService : IDebugDashboardNotificationService
-{
-    public Task NotifyNewRequestAsync(RequestEntry request) => Task.CompletedTask;
-    public Task NotifyNewSqlQueryAsync(SqlQueryEntry query) => Task.CompletedTask;
-    public Task NotifyNewLogAsync(LogEntry log) => Task.CompletedTask;
-    public Task NotifyNewExceptionAsync(ExceptionEntry exception) => Task.CompletedTask;
-    public Task NotifyStatsUpdatedAsync(DebugStats stats) => Task.CompletedTask;
-    public Task NotifyDataClearedAsync() => Task.CompletedTask;
 }
