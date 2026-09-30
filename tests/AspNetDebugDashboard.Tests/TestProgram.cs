@@ -46,6 +46,47 @@ app.MapGet("/test", async context =>
     await context.Response.WriteAsync("Test endpoint");
 });
 
+// Exercises outgoing HTTP capture: calls whatever url the test points it at with a plain
+// `new HttpClient()`, optionally attaching a body/header that should get redacted.
+app.MapGet("/test-outgoing", async context =>
+{
+    var url = context.Request.Query["url"].ToString();
+    var withBody = context.Request.Query["withBody"] == "true";
+    var withAuthHeader = context.Request.Query["withAuthHeader"] == "true";
+
+    using var client = new HttpClient();
+    if (int.TryParse(context.Request.Query["timeoutMs"], out var timeoutMs))
+    {
+        client.Timeout = TimeSpan.FromMilliseconds(timeoutMs);
+    }
+    if (withAuthHeader)
+    {
+        client.DefaultRequestHeaders.Add("Authorization", "Bearer secret-token");
+    }
+
+    try
+    {
+        HttpResponseMessage response;
+        if (withBody)
+        {
+            var content = new StringContent("{\"username\":\"bob\",\"password\":\"hunter2\"}", System.Text.Encoding.UTF8, "application/json");
+            response = await client.PostAsync(url, content);
+        }
+        else
+        {
+            response = await client.GetAsync(url);
+        }
+        var body = await response.Content.ReadAsStringAsync();
+        context.Response.StatusCode = (int)response.StatusCode;
+        await context.Response.WriteAsync(body);
+    }
+    catch (Exception ex)
+    {
+        context.Response.StatusCode = 502;
+        await context.Response.WriteAsync(ex.Message);
+    }
+});
+
 app.MapControllers();
 
 app.Run();

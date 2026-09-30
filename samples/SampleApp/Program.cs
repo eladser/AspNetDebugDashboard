@@ -63,6 +63,9 @@ builder.Services.AddHealthChecks()
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 
+// Plain HttpClient so calls made from ExternalApiController show up under Outgoing/HTTP
+builder.Services.AddHttpClient();
+
 var app = builder.Build();
 
 // IMPORTANT: Force enable Debug Dashboard regardless of environment
