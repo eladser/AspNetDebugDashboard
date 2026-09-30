@@ -116,6 +116,7 @@ public class ExportData
     public List<SqlQueryEntry> Queries { get; set; } = new();
     public List<LogEntry> Logs { get; set; } = new();
     public List<ExceptionEntry> Exceptions { get; set; } = new();
+    public List<DumpEntry> Dumps { get; set; } = new();
     public Dictionary<string, object> Metadata { get; set; } = new();
 }
 

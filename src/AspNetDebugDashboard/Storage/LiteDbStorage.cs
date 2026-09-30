@@ -181,6 +181,9 @@ public class LiteDbStorage : IDebugStorage
             if (!string.IsNullOrEmpty(filter.RequestId))
                 query = query.Where(x => x.RequestId == filter.RequestId);
 
+            if (!string.IsNullOrEmpty(filter.Search))
+                query = query.Where(x => x.Json.Contains(filter.Search) || (x.Label ?? "").Contains(filter.Search) || x.TypeName.Contains(filter.Search));
+
             var totalCount = query.Count();
 
             var items = query
@@ -408,7 +411,8 @@ public class LiteDbStorage : IDebugStorage
             var totalSqlQueries = _sqlQueries.Count();
             var totalExceptions = _exceptions.Count();
             var totalLogs = _logs.Count();
-            
+            var totalDumps = _dumps.Count();
+
             var avgResponseTime = _requests.Query()
                 .ToList()
                 .Select(x => (double)x.ExecutionTimeMs)
@@ -469,6 +473,7 @@ public class LiteDbStorage : IDebugStorage
                 TotalSqlQueries = totalSqlQueries,
                 TotalExceptions = totalExceptions,
                 TotalLogs = totalLogs,
+                TotalDumps = totalDumps,
                 AverageResponseTime = avgResponseTime,
                 AverageSqlTime = avgSqlTime,
                 StatusCodeDistribution = statusCodes,
@@ -528,7 +533,8 @@ public class LiteDbStorage : IDebugStorage
             Requests = _requests.FindAll().ToList(),
             Queries = _sqlQueries.FindAll().ToList(),
             Logs = _logs.FindAll().ToList(),
-            Exceptions = _exceptions.FindAll().ToList()
+            Exceptions = _exceptions.FindAll().ToList(),
+            Dumps = _dumps.FindAll().ToList()
         });
     }
 
@@ -543,6 +549,7 @@ public class LiteDbStorage : IDebugStorage
                 _sqlQueries.InsertBulk(exportData.Queries);
                 _logs.InsertBulk(exportData.Logs);
                 _exceptions.InsertBulk(exportData.Exceptions);
+                _dumps.InsertBulk(exportData.Dumps);
             }
         });
     }
@@ -589,6 +596,15 @@ public class LiteDbStorage : IDebugStorage
                     .Limit(maxResults / types.Length)
                     .ToList();
                 results.AddRange(queryResults);
+            }
+
+            if (types.Contains("dumps"))
+            {
+                var dumpResults = _dumps.Query()
+                    .Where(x => x.Json.ToLower().Contains(termLower) || (x.Label ?? "").ToLower().Contains(termLower))
+                    .Limit(maxResults / types.Length)
+                    .ToList();
+                results.AddRange(dumpResults);
             }
 
             return results.Take(maxResults);

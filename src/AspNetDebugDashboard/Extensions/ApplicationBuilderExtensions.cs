@@ -65,6 +65,13 @@ public static class ApplicationBuilderExtensions
 
     private static IApplicationBuilder ConfigureDebugDashboard(IApplicationBuilder app)
     {
+        // Wire up the static DebugDump sink now that we know the dashboard is active.
+        // Before this runs (or if the dashboard is never enabled) Dump() is a no-op.
+        var storage = app.ApplicationServices.GetRequiredService<IDebugStorage>();
+        var debugContext = app.ApplicationServices.GetRequiredService<DebugContext>();
+        var dumpConfig = app.ApplicationServices.GetRequiredService<IOptions<DebugConfiguration>>().Value;
+        DebugDump.Attach(storage, debugContext, dumpConfig);
+
         // Rewrite a custom BasePath onto the canonical "/_debug" prefix the controllers'
         // route attributes match on, so any configured BasePath actually works.
         app.Use(async (context, next) =>
