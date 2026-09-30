@@ -52,4 +52,16 @@ public class DebugConfiguration
     // listening, so you add that source to your OpenTelemetry tracing to
     // forward them (Aspire, Jaeger, any OTLP backend).
     public bool EmitActivities { get; set; } = true;
+
+    // Outgoing HTTP capture via DiagnosticListener (HttpClient, not only IHttpClientFactory).
+    public bool CaptureOutgoingHttp { get; set; } = true;
+    public bool CaptureOutgoingHttpBodies { get; set; } = false;
+    public int MaxOutgoingBodySize { get; set; } = 64 * 1024; // 64KB
+    public bool CaptureUnattachedOutgoingHttp { get; set; } = false;
+
+    // DebugDump snapshot limits.
+    public int DumpMaxDepth { get; set; } = 6;
+    public int DumpMaxItems { get; set; } = 100;
+    public int DumpMaxSize { get; set; } = 64 * 1024; // 64KB
+    public int MaxDumpsPerRequest { get; set; } = 50;
 }

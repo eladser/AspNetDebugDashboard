@@ -50,4 +50,18 @@ public interface IDebugStorage : IDisposable
     Task OptimizeAsync();
     Task<long> GetDatabaseSizeAsync();
     Task<int> GetTotalEntriesAsync();
+    
+    // Outgoing HTTP capture
+    Task<string> StoreOutgoingHttpAsync(OutgoingHttpEntry entry);
+    Task<PagedResult<OutgoingHttpEntry>> GetOutgoingHttpAsync(DebugFilter filter);
+    Task<OutgoingHttpEntry?> GetOutgoingHttpEntryAsync(string id);
+    Task<int> GetOutgoingHttpCountAsync();
+    Task<bool> DeleteOutgoingHttpAsync(string id);
+    
+    // Dumps
+    Task<string> StoreDumpAsync(DumpEntry entry);
+    Task<PagedResult<DumpEntry>> GetDumpsAsync(DebugFilter filter);
+    Task<DumpEntry?> GetDumpAsync(string id);
+    Task<int> GetDumpCountAsync();
+    Task<bool> DeleteDumpAsync(string id);
 }

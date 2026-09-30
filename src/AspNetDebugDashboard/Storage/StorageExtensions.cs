@@ -14,7 +14,8 @@ public static class StorageExtensions
         services.AddSingleton<IDebugStorage>(provider =>
         {
             var connectionString = config.DatabasePath;
-            return new LiteDbStorage(connectionString, config);
+            var eventBus = provider.GetRequiredService<DebugEventBus>();
+            return new LiteDbStorage(connectionString, config, eventBus);
         });
         
         services.AddHostedService<StorageCleanupService>();

@@ -2,6 +2,14 @@
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+
+### Changed
+
+### Fixed
+
 ## [2.3.0] - 2026-09-30
 
 ### Security

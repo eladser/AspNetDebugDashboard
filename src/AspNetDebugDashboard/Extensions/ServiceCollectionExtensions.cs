@@ -53,6 +53,17 @@ public static class ServiceCollectionExtensions
             options.CleanupInterval = config.CleanupInterval;
             options.MaxDatabaseSize = config.MaxDatabaseSize;
             options.EmitActivities = config.EmitActivities;
+#pragma warning disable CS0618
+            options.EnableRealTimeUpdates = config.EnableRealTimeUpdates;
+#pragma warning restore CS0618
+            options.CaptureOutgoingHttp = config.CaptureOutgoingHttp;
+            options.CaptureOutgoingHttpBodies = config.CaptureOutgoingHttpBodies;
+            options.MaxOutgoingBodySize = config.MaxOutgoingBodySize;
+            options.CaptureUnattachedOutgoingHttp = config.CaptureUnattachedOutgoingHttp;
+            options.DumpMaxDepth = config.DumpMaxDepth;
+            options.DumpMaxItems = config.DumpMaxItems;
+            options.DumpMaxSize = config.DumpMaxSize;
+            options.MaxDumpsPerRequest = config.MaxDumpsPerRequest;
         });
         
         // Advertise the dashboard to the shared suite sidebar (first slot)
@@ -61,6 +72,7 @@ public static class ServiceCollectionExtensions
         // Register core services
         services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
         services.AddSingleton<DebugContext>();
+        services.AddSingleton<DebugEventBus>();
         services.AddScoped<IDebugLogger, Core.Services.DebugLogger>();
         services.AddScoped<IDebugDashboardService, DebugDashboardService>();
         

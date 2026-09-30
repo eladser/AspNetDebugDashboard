@@ -39,6 +39,7 @@ public class DebugRequestMiddleware
         // Register the request so the EF interceptor and IDebugLogger can
         // attach queries/logs to it while it's in flight.
         _debugContext.StartRequest(requestId, new RequestEntry { RequestId = requestId });
+        DebugContext.Current.Value = new RequestScope(requestId, Activity.Current?.TraceId.ToHexString());
 
         try
         {
@@ -74,6 +75,10 @@ public class DebugRequestMiddleware
             stopwatch.Stop();
             await LogRequestAsync(context, requestId, requestBody, responseBody, stopwatch.ElapsedMilliseconds, ex);
             throw;
+        }
+        finally
+        {
+            DebugContext.Current.Value = null;
         }
     }
 
