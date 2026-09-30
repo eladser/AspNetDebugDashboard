@@ -19,6 +19,8 @@ public class ExternalApiController : ControllerBase
     public async Task<ActionResult<string>> GetZen()
     {
         var client = _httpClientFactory.CreateClient();
+        // api.github.com rejects requests without a User-Agent (403)
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("AspNetDebugDashboard-SampleApp");
         try
         {
             var zen = await client.GetStringAsync("https://api.github.com/zen");

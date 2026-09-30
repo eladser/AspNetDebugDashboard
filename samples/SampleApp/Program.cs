@@ -32,6 +32,7 @@ builder.Services.AddDebugDashboard(config =>
     config.LogSqlQueries = true;
     config.LogExceptions = true;
     config.MaxEntries = 1000;
+    config.CaptureOutgoingHttpBodies = true;
 });
 
 // SQLite so the EF interceptor has real SQL to capture
