@@ -21,7 +21,6 @@ internal sealed class TeeHttpContent : HttpContent
 
         foreach (var header in inner.Headers)
         {
-            if (header.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase)) continue;
             Headers.TryAddWithoutValidation(header.Key, header.Value);
         }
     }
@@ -45,8 +44,8 @@ internal sealed class TeeHttpContent : HttpContent
 
     protected override bool TryComputeLength(out long length)
     {
-        length = 0;
-        return false;
+        length = _inner.Headers.ContentLength ?? 0;
+        return _inner.Headers.ContentLength.HasValue;
     }
 
     protected override void Dispose(bool disposing)

@@ -36,23 +36,23 @@ public class DebugContext
     {
         if (_requestSqlQueries.TryGetValue(requestId, out var queries))
         {
-            queries.Add(query);
+            lock (queries) queries.Add(query);
         }
     }
-    
+
     public void AddLog(string requestId, LogEntry log)
     {
         if (_requestLogs.TryGetValue(requestId, out var logs))
         {
-            logs.Add(log);
+            lock (logs) logs.Add(log);
         }
     }
-    
+
     public void AddOutgoingHttp(string requestId, OutgoingHttpEntry entry)
     {
         if (_requestOutgoingHttp.TryGetValue(requestId, out var entries))
         {
-            entries.Add(entry);
+            lock (entries) entries.Add(entry);
         }
     }
     
@@ -73,17 +73,17 @@ public class DebugContext
         {
             if (_requestSqlQueries.TryRemove(requestId, out var queries))
             {
-                request.SqlQueries = queries;
+                lock (queries) request.SqlQueries = queries.ToList();
             }
-            
+
             if (_requestLogs.TryRemove(requestId, out var logs))
             {
-                request.Logs = logs;
+                lock (logs) request.Logs = logs.ToList();
             }
-            
+
             if (_requestOutgoingHttp.TryRemove(requestId, out var outgoingHttp))
             {
-                request.OutgoingHttp = outgoingHttp;
+                lock (outgoingHttp) request.OutgoingHttp = outgoingHttp.ToList();
             }
             
             if (_requestDumps.TryRemove(requestId, out var dumps))
