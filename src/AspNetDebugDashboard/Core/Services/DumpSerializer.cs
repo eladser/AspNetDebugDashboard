@@ -1,8 +1,11 @@
 using AspNetDebugDashboard.Core.Models;
 using System.Collections;
+using System.Linq;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace AspNetDebugDashboard.Core.Services;
 
@@ -107,6 +110,7 @@ public static class DumpSerializer
         foreach (var prop in props)
         {
             if (!prop.CanRead || prop.GetIndexParameters().Length > 0) continue;
+            if (prop.PropertyType.IsByRefLike || prop.PropertyType.IsPointer) continue;
 
             if (count >= config.DumpMaxItems)
             {
@@ -162,10 +166,72 @@ public static class DumpSerializer
                 or DateTime or DateTimeOffset:
                 node = JsonSerializer.SerializeToNode(value, value.GetType());
                 return true;
+            // Reading .Result on a Task<T> can block or deadlock the request thread, so treat
+            // tasks as opaque leaves and only ever look at their status.
+            case Task task:
+                node = JsonValue.Create($"{FriendlyTypeName(task.GetType())} ({task.Status})");
+                return true;
+            case Type type:
+                node = JsonValue.Create(type.FullName ?? type.Name);
+                return true;
+            case Assembly asm:
+                node = JsonValue.Create(asm.FullName ?? asm.GetName().Name);
+                return true;
+            case Module module:
+                node = JsonValue.Create(module.Name);
+                return true;
+            case MemberInfo member:
+                node = JsonValue.Create($"{member.DeclaringType?.Name}.{member.Name}");
+                return true;
+            case Delegate del:
+                node = JsonValue.Create($"{del.Method.DeclaringType?.Name}.{del.Method.Name}");
+                return true;
+            case Stream stream:
+                node = JsonValue.Create($"{stream.GetType().Name} (CanRead={stream.CanRead}, CanWrite={stream.CanWrite})");
+                return true;
+            case CancellationToken token:
+                node = JsonValue.Create($"CancellationToken (CanBeCanceled={token.CanBeCanceled}, IsCancellationRequested={token.IsCancellationRequested})");
+                return true;
+            case IntPtr or UIntPtr:
+                node = JsonValue.Create(value.ToString());
+                return true;
+            case Thread thread:
+                node = JsonValue.Create($"Thread {thread.ManagedThreadId} ({thread.Name ?? "unnamed"})");
+                return true;
+            case WaitHandle:
+                node = JsonValue.Create(value.GetType().Name);
+                return true;
+            // IQueryable enumeration runs a real DB query, so it's never touched here.
+            case IQueryable queryable:
+                node = JsonValue.Create($"IQueryable<{queryable.ElementType.Name}> (not enumerated)");
+                return true;
             default:
+                var t = value.GetType();
+                if (t == typeof(ValueTask) || (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(ValueTask<>)))
+                {
+                    node = JsonValue.Create($"{FriendlyTypeName(t)} ({ValueTaskStatus(value, t)})");
+                    return true;
+                }
                 node = null;
                 return false;
         }
+    }
+
+    private static string FriendlyTypeName(Type type)
+    {
+        if (!type.IsGenericType) return type.Name;
+        var name = type.Name[..type.Name.IndexOf('`')];
+        var args = string.Join(", ", type.GetGenericArguments().Select(FriendlyTypeName));
+        return $"{name}<{args}>";
+    }
+
+    private static string ValueTaskStatus(object value, Type type)
+    {
+        bool Get(string name) => (bool)type.GetProperty(name)!.GetValue(value)!;
+        if (!Get("IsCompleted")) return "Pending";
+        if (Get("IsFaulted")) return "Faulted";
+        if (Get("IsCanceled")) return "Canceled";
+        return "RanToCompletion";
     }
 
     private static bool IsRedacted(string name, DebugConfiguration config) =>

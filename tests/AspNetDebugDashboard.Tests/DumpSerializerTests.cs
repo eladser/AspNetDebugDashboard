@@ -1,6 +1,8 @@
 using AspNetDebugDashboard.Core.Models;
 using AspNetDebugDashboard.Core.Services;
 using FluentAssertions;
+using System.Collections;
+using System.Linq;
 using System.Text.Json.Nodes;
 using Xunit;
 
@@ -32,6 +34,36 @@ public class DumpSerializerTests
         public string Username { get; set; } = "elad";
         public string Password { get; set; } = "hunter2";
         public string ApiKey { get; set; } = "sk-secret";
+    }
+
+    private sealed class FakeQueryable<T> : IQueryable<T>
+    {
+        private readonly List<T> _items;
+        public int EnumerationCount;
+
+        public FakeQueryable(List<T> items)
+        {
+            _items = items;
+            Expression = System.Linq.Expressions.Expression.Constant(this);
+        }
+
+        public Type ElementType => typeof(T);
+        public System.Linq.Expressions.Expression Expression { get; }
+        public IQueryProvider Provider => throw new NotSupportedException("query should never execute");
+
+        public IEnumerator<T> GetEnumerator()
+        {
+            EnumerationCount++;
+            return _items.GetEnumerator();
+        }
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
+    private static IEnumerable<int> InfiniteSequence()
+    {
+        var i = 0;
+        while (true) yield return i++;
     }
 
     [Fact]
@@ -134,5 +166,72 @@ public class DumpSerializerTests
     {
         DumpSerializer.Serialize(new Credentials(), Config()).TypeName.Should().Contain("Credentials");
         DumpSerializer.Serialize((object?)null, Config()).TypeName.Should().Be("null");
+    }
+
+    [Fact]
+    public void Never_completing_task_is_dumped_as_a_leaf_without_blocking()
+    {
+        var tcs = new TaskCompletionSource<int>();
+
+        var entry = DumpSerializer.Serialize(tcs.Task, Config());
+
+        var text = JsonNode.Parse(entry.Json)!.GetValue<string>();
+        text.Should().StartWith("Task<Int32>");
+        text.Should().NotContain("RanToCompletion");
+    }
+
+    [Fact]
+    public void Task_property_on_an_object_does_not_block_the_dump()
+    {
+        var holder = new { Background = new TaskCompletionSource<int>().Task };
+
+        var act = () => DumpSerializer.Serialize(holder, Config());
+
+        act.Should().NotThrow();
+        var entry = act();
+        var text = JsonNode.Parse(entry.Json)!["Background"]!.GetValue<string>();
+        text.Should().StartWith("Task<Int32>");
+    }
+
+    [Fact]
+    public void Completed_task_shows_its_status()
+    {
+        var entry = DumpSerializer.Serialize(Task.FromResult(42), Config());
+
+        var text = JsonNode.Parse(entry.Json)!.GetValue<string>();
+        text.Should().Be("Task<Int32> (RanToCompletion)");
+    }
+
+    [Fact]
+    public void IQueryable_is_rendered_as_a_leaf_without_enumerating()
+    {
+        var query = new FakeQueryable<int>(new List<int> { 1, 2, 3 });
+
+        var entry = DumpSerializer.Serialize(query, Config());
+
+        var text = JsonNode.Parse(entry.Json)!.GetValue<string>();
+        text.Should().Be("IQueryable<Int32> (not enumerated)");
+        query.EnumerationCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void Infinite_enumerable_is_bounded_by_max_items()
+    {
+        var entry = DumpSerializer.Serialize(InfiniteSequence(), Config(items: 5));
+
+        entry.Truncated.Should().BeTrue();
+        var arr = JsonNode.Parse(entry.Json)!.AsArray();
+        arr.Count.Should().Be(5);
+    }
+
+    [Fact]
+    public void Type_and_delegate_values_serialize_as_leaves()
+    {
+        var typeEntry = DumpSerializer.Serialize(typeof(Credentials), Config());
+        typeEntry.Json.Should().Contain("Credentials");
+
+        Action del = Type_and_delegate_values_serialize_as_leaves;
+        var delEntry = DumpSerializer.Serialize(del, Config());
+        delEntry.Json.Should().Contain("Type_and_delegate_values_serialize_as_leaves");
     }
 }
