@@ -59,6 +59,7 @@ public interface IDebugStorage : IDisposable
     Task<OutgoingHttpEntry?> GetOutgoingHttpEntryAsync(string id);
     Task<int> GetOutgoingHttpCountAsync();
     Task<bool> DeleteOutgoingHttpAsync(string id);
+    Task<bool> UpdateOutgoingHttpResponseBodyAsync(string id, string responseBody);
     
     // Dumps
     Task<string> StoreDumpAsync(DumpEntry entry);

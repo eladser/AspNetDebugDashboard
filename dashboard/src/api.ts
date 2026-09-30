@@ -4,6 +4,7 @@ import type {
   ExceptionEntry,
   ListQuery,
   LogEntry,
+  OutgoingHttpEntry,
   PagedResult,
   PerfMetrics,
   RequestEntry,
@@ -42,6 +43,7 @@ function listUrl(resource: string, q: ListQuery): string {
   if (q.isSlowQuery !== undefined) p.set('isSlowQuery', String(q.isSlowQuery));
   if (q.minExecutionTime !== undefined) p.set('minExecutionTime', String(q.minExecutionTime));
   if (q.requestId) p.set('requestId', q.requestId);
+  if (q.host) p.set('host', q.host);
   return `${apiBase}/${resource}?${p}`;
 }
 
@@ -67,6 +69,10 @@ export const api = {
   dumps: (q: ListQuery, signal?: AbortSignal) =>
     getJson<PagedResult<DumpEntry>>(listUrl('dumps', q), signal),
   dump: (id: string) => getJson<DumpEntry>(`${apiBase}/dumps/${id}`),
+
+  outgoingHttp: (q: ListQuery, signal?: AbortSignal) =>
+    getJson<PagedResult<OutgoingHttpEntry>>(listUrl('http-requests', q), signal),
+  outgoingHttpCall: (id: string) => getJson<OutgoingHttpEntry>(`${apiBase}/http-requests/${id}`),
 
   performance: (signal?: AbortSignal) => getJson<PerfMetrics>(`${apiBase}/performance`, signal),
 

@@ -248,6 +248,10 @@ public class DebugApiControllerTests
         {
             Items = _fixture.CreateMany<DumpEntry>(2).ToList()
         };
+        var mockHttpCalls = new PagedResult<OutgoingHttpEntry>
+        {
+            Items = _fixture.CreateMany<OutgoingHttpEntry>(2).ToList()
+        };
 
         _mockStorage.Setup(x => x.GetStatsAsync()).ReturnsAsync(mockStats);
         _mockStorage.Setup(x => x.GetRequestsAsync(It.IsAny<DebugFilter>())).ReturnsAsync(mockRequests);
@@ -255,6 +259,7 @@ public class DebugApiControllerTests
         _mockStorage.Setup(x => x.GetLogsAsync(It.IsAny<DebugFilter>())).ReturnsAsync(mockLogs);
         _mockStorage.Setup(x => x.GetExceptionsAsync(It.IsAny<DebugFilter>())).ReturnsAsync(mockExceptions);
         _mockStorage.Setup(x => x.GetDumpsAsync(It.IsAny<DebugFilter>())).ReturnsAsync(mockDumps);
+        _mockStorage.Setup(x => x.GetOutgoingHttpAsync(It.IsAny<DebugFilter>())).ReturnsAsync(mockHttpCalls);
 
         // Act
         var result = await controller.ExportData();

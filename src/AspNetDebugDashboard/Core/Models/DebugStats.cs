@@ -7,6 +7,7 @@ public class DebugStats
     public int TotalExceptions { get; set; }
     public int TotalLogs { get; set; }
     public int TotalDumps { get; set; }
+    public int TotalOutgoingHttp { get; set; }
     public double AverageResponseTime { get; set; }
     public double AverageSqlTime { get; set; }
     public Dictionary<int, int> StatusCodeDistribution { get; set; } = new();

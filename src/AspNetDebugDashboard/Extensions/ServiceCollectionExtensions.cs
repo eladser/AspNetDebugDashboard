@@ -1,6 +1,7 @@
 using AspNetDebugDashboard.Core.Models;
 using AspNetDebugDashboard.Core.Services;
 using AspNetDebugDashboard.Storage;
+using AspNetDebugDashboard.Capture;
 using AspNetDebugDashboard.Interceptors;
 using AspNetDebugDashboard.Services;
 using AspNetDebugDashboard.Suite;
@@ -87,7 +88,12 @@ public static class ServiceCollectionExtensions
         {
             services.AddHostedService<DebugDashboardCleanupService>();
         }
-        
+
+        if (config.IsEnabled && config.CaptureOutgoingHttp)
+        {
+            services.AddHostedService<OutgoingHttpObserver>();
+        }
+
         // Register health checks
         services.AddHealthChecks()
             .AddCheck<DebugDashboardHealthCheck>("debug-dashboard", 

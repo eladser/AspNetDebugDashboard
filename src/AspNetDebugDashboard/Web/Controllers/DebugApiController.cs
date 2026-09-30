@@ -135,10 +135,10 @@ public class DebugApiController : ControllerBase
     public async Task<ActionResult<ExceptionEntry>> GetException(string id)
     {
         if (CheckAccess() is { } deny) return deny;
-        
+
         var exception = await _storage.GetExceptionAsync(id);
         if (exception == null) return NotFound();
-        
+
         return Ok(exception);
     }
 
@@ -162,6 +162,28 @@ public class DebugApiController : ControllerBase
         if (dump == null) return NotFound();
 
         return Ok(dump);
+    }
+
+    [HttpGet("/_debug/api/http-requests")]
+    [HttpGet("/_custom-debug/api/http-requests")]
+    public async Task<ActionResult<PagedResult<OutgoingHttpEntry>>> GetHttpRequests([FromQuery] DebugFilter filter)
+    {
+        if (CheckAccess() is { } deny) return deny;
+
+        var calls = await _storage.GetOutgoingHttpAsync(filter);
+        return Ok(calls);
+    }
+
+    [HttpGet("/_debug/api/http-requests/{id}")]
+    [HttpGet("/_custom-debug/api/http-requests/{id}")]
+    public async Task<ActionResult<OutgoingHttpEntry>> GetHttpRequest(string id)
+    {
+        if (CheckAccess() is { } deny) return deny;
+
+        var call = await _storage.GetOutgoingHttpEntryAsync(id);
+        if (call == null) return NotFound();
+
+        return Ok(call);
     }
 
     [HttpPost("/_debug/api/logs")]
@@ -240,6 +262,7 @@ public class DebugApiController : ControllerBase
         var logs = await _storage.GetLogsAsync(new DebugFilter { PageSize = int.MaxValue });
         var exceptions = await _storage.GetExceptionsAsync(new DebugFilter { PageSize = int.MaxValue });
         var dumps = await _storage.GetDumpsAsync(new DebugFilter { PageSize = int.MaxValue });
+        var httpCalls = await _storage.GetOutgoingHttpAsync(new DebugFilter { PageSize = int.MaxValue });
 
         var exportData = new
         {
@@ -249,7 +272,8 @@ public class DebugApiController : ControllerBase
             Queries = queries.Items,
             Logs = logs.Items,
             Exceptions = exceptions.Items,
-            Dumps = dumps.Items
+            Dumps = dumps.Items,
+            HttpRequests = httpCalls.Items
         };
 
         var json = JsonSerializer.Serialize(exportData, new JsonSerializerOptions 
@@ -303,10 +327,10 @@ public class DebugApiController : ControllerBase
 
         if (types == null || types.Contains("exceptions"))
         {
-            var exceptions = await _storage.GetExceptionsAsync(new DebugFilter 
-            { 
-                Search = term, 
-                PageSize = 10 
+            var exceptions = await _storage.GetExceptionsAsync(new DebugFilter
+            {
+                Search = term,
+                PageSize = 10
             });
             results.AddRange(exceptions.Items.Select(e => new { Type = "exception", Data = e }));
         }
@@ -319,6 +343,16 @@ public class DebugApiController : ControllerBase
                 PageSize = 10
             });
             results.AddRange(dumps.Items.Select(d => new { Type = "dump", Data = d }));
+        }
+
+        if (types == null || types.Contains("http"))
+        {
+            var httpCalls = await _storage.GetOutgoingHttpAsync(new DebugFilter
+            {
+                Search = term,
+                PageSize = 10
+            });
+            results.AddRange(httpCalls.Items.Select(h => new { Type = "http", Data = h }));
         }
 
         return Ok(results.Take(50));

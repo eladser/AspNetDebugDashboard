@@ -136,6 +136,20 @@ public class LiteDbStorage : IDebugStorage
             if (!string.IsNullOrEmpty(filter.RequestId))
                 query = query.Where(x => x.RequestId == filter.RequestId);
 
+            if (!string.IsNullOrEmpty(filter.Search))
+                query = query.Where(x => x.Url.Contains(filter.Search) || x.Host.Contains(filter.Search));
+
+            if (!string.IsNullOrEmpty(filter.Host))
+                query = query.Where(x => x.Host.Contains(filter.Host));
+
+            // IsSuccessful=false means "failed only" (no response, or 4xx/5xx)
+            if (filter.IsSuccessful.HasValue)
+            {
+                query = filter.IsSuccessful.Value
+                    ? query.Where(x => x.StatusCode != null && x.StatusCode < 400)
+                    : query.Where(x => x.StatusCode == null || x.StatusCode >= 400);
+            }
+
             var totalCount = query.Count();
 
             var items = query
@@ -170,6 +184,20 @@ public class LiteDbStorage : IDebugStorage
     {
         if (_disposed) throw new ObjectDisposedException(nameof(LiteDbStorage));
         return await RunGatedAsync(() => _outgoingHttp.Delete(id));
+    }
+
+    // Called once the response body stream finishes: the entry was already stored without
+    // it so the dashboard shows the call right away instead of waiting on a slow download.
+    public async Task<bool> UpdateOutgoingHttpResponseBodyAsync(string id, string responseBody)
+    {
+        if (_disposed) throw new ObjectDisposedException(nameof(LiteDbStorage));
+        return await Task.Run(() =>
+        {
+            var entry = _outgoingHttp.FindById(id);
+            if (entry == null) return false;
+            entry.ResponseBody = responseBody;
+            return _outgoingHttp.Update(entry);
+        });
     }
 
     public async Task<PagedResult<DumpEntry>> GetDumpsAsync(DebugFilter filter)
@@ -415,6 +443,8 @@ public class LiteDbStorage : IDebugStorage
             var totalExceptions = _exceptions.Count();
             var totalLogs = _logs.Count();
             var totalDumps = _dumps.Count();
+            var totalOutgoingHttp = _outgoingHttp.Count();
+
 
             var avgResponseTime = _requests.Query()
                 .ToList()
@@ -477,6 +507,7 @@ public class LiteDbStorage : IDebugStorage
                 TotalExceptions = totalExceptions,
                 TotalLogs = totalLogs,
                 TotalDumps = totalDumps,
+                TotalOutgoingHttp = totalOutgoingHttp,
                 AverageResponseTime = avgResponseTime,
                 AverageSqlTime = avgSqlTime,
                 StatusCodeDistribution = statusCodes,
@@ -541,7 +572,8 @@ public class LiteDbStorage : IDebugStorage
             Queries = _sqlQueries.FindAll().ToList(),
             Logs = _logs.FindAll().ToList(),
             Exceptions = _exceptions.FindAll().ToList(),
-            Dumps = _dumps.FindAll().ToList()
+            Dumps = _dumps.FindAll().ToList(),
+            OutgoingHttp = _outgoingHttp.FindAll().ToList()
         });
     }
 
@@ -557,6 +589,7 @@ public class LiteDbStorage : IDebugStorage
                 _logs.InsertBulk(exportData.Logs);
                 _exceptions.InsertBulk(exportData.Exceptions);
                 _dumps.InsertBulk(exportData.Dumps);
+                if (exportData.OutgoingHttp.Count > 0) _outgoingHttp.InsertBulk(exportData.OutgoingHttp);
             }
         });
     }
@@ -612,6 +645,15 @@ public class LiteDbStorage : IDebugStorage
                     .Limit(maxResults / types.Length)
                     .ToList();
                 results.AddRange(dumpResults);
+            }
+
+            if (types.Contains("http"))
+            {
+                var httpResults = _outgoingHttp.Query()
+                    .Where(x => x.Url.ToLower().Contains(termLower) || x.Host.ToLower().Contains(termLower))
+                    .Limit(maxResults / types.Length)
+                    .ToList();
+                results.AddRange(httpResults);
             }
 
             return results.Take(maxResults);
@@ -682,6 +724,7 @@ public class LiteDbStorage : IDebugStorage
                     "queries" => _sqlQueries.Delete(id),
                     "logs" => _logs.Delete(id),
                     "exceptions" => _exceptions.Delete(id),
+                    "http" => _outgoingHttp.Delete(id),
                     _ => false
                 };
                 if (success) deleted++;
