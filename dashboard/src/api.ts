@@ -81,4 +81,5 @@ export const api = {
 
   clearAll: () => fetch(`${apiBase}/clear`, { method: 'DELETE' }),
   exportUrl: `${apiBase}/export`,
+  streamUrl: `${apiBase}/stream`,
 };

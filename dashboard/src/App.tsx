@@ -1,5 +1,6 @@
 import { createRef, useEffect, useRef, useState } from 'react';
 import { api } from './api';
+import { useLiveTick } from './live';
 import type { DebugStats, SearchHit } from './types';
 import { Overview } from './views/Overview';
 import { Performance } from './views/Performance';
@@ -54,7 +55,6 @@ const NAV: { group: string; tabs: { id: Tab; label: string; icon: React.ReactNod
 ];
 
 const ALL_TABS = NAV.flatMap((g) => g.tabs);
-const POLL_MS = 5000;
 
 // Sibling suite tools the server injected (Mailbox, Flags, Jobs, Vitals), if installed.
 interface SuitePanel { name: string; route: string; icon: string; }
@@ -199,7 +199,9 @@ function GlobalSearch({ onOpen }: { onOpen: (ref: DetailRef) => void }) {
 export default function App() {
   const [tab, setTabState] = useState<Tab>(tabFromHash);
   const [live, setLive] = useState(true);
-  const [tick, setTick] = useState(0);
+  const liveTick = useLiveTick(live);
+  const [manualTick, setManualTick] = useState(0);
+  const tick = liveTick + manualTick;
   const [detail, setDetail] = useState<DetailRef | null>(null);
   const [counts, setCounts] = useState<DebugStats | null>(null);
   const searchRef = createRef<HTMLInputElement>();
@@ -214,12 +216,6 @@ export default function App() {
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
-
-  useEffect(() => {
-    if (!live) return;
-    const t = window.setInterval(() => setTick((n) => n + 1), POLL_MS);
-    return () => window.clearInterval(t);
-  }, [live]);
 
   // sidebar counts piggyback on the same tick
   useEffect(() => {
@@ -256,7 +252,7 @@ export default function App() {
   const clearAll = async () => {
     if (!window.confirm('Delete all captured data?')) return;
     await api.clearAll();
-    setTick((n) => n + 1);
+    setManualTick((n) => n + 1);
   };
 
   const viewProps = { tick, navEnabled: !detail, searchRef, onOpen: setDetail };
