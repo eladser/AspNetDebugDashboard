@@ -20,7 +20,7 @@ public class McpStdioSmokeTests
         "get_stats", "recent_requests", "get_request", "recent_queries", "recent_exceptions",
         "recent_logs", "performance", "search",
         "list_feature_flags", "recent_jobs", "app_vitals", "recent_mail",
-        "recent_dumps",
+        "recent_dumps", "recent_outgoing_http",
     ];
 
     [Fact]

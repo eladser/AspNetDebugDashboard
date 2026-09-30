@@ -191,7 +191,7 @@ public class LiteDbStorage : IDebugStorage
     public async Task<bool> UpdateOutgoingHttpResponseBodyAsync(string id, string responseBody)
     {
         if (_disposed) throw new ObjectDisposedException(nameof(LiteDbStorage));
-        return await Task.Run(() =>
+        return await RunGatedAsync(() =>
         {
             var entry = _outgoingHttp.FindById(id);
             if (entry == null) return false;

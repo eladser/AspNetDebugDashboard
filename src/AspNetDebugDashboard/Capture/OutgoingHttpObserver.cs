@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using AspNetDebugDashboard.Core.Models;
 using AspNetDebugDashboard.Core.Services;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
@@ -16,7 +17,10 @@ namespace AspNetDebugDashboard.Capture;
 // every target framework.
 public sealed class OutgoingHttpObserver : IHostedService, IObserver<DiagnosticListener>, IObserver<KeyValuePair<string, object?>>
 {
-    private readonly IDebugStorage _storage;
+    // Resolved lazily on first capture, not injected directly - IDebugStorage is a lazy
+    // singleton, and taking it as a constructor param here would build it (and create the
+    // db file) as soon as the host resolves IHostedService, even outside AllowedEnvironments.
+    private readonly IServiceProvider _serviceProvider;
     private readonly DebugContext _debugContext;
     private readonly IOptions<DebugConfiguration> _config;
     private readonly IWebHostEnvironment _env;
@@ -27,13 +31,15 @@ public sealed class OutgoingHttpObserver : IHostedService, IObserver<DiagnosticL
     private IDisposable? _allListenersSubscription;
     private readonly List<IDisposable> _listenerSubscriptions = new();
 
-    public OutgoingHttpObserver(IDebugStorage storage, DebugContext debugContext, IOptions<DebugConfiguration> config, IWebHostEnvironment env)
+    public OutgoingHttpObserver(IServiceProvider serviceProvider, DebugContext debugContext, IOptions<DebugConfiguration> config, IWebHostEnvironment env)
     {
-        _storage = storage;
+        _serviceProvider = serviceProvider;
         _debugContext = debugContext;
         _config = config;
         _env = env;
     }
+
+    private IDebugStorage Storage => _serviceProvider.GetRequiredService<IDebugStorage>();
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -166,7 +172,7 @@ public sealed class OutgoingHttpObserver : IHostedService, IObserver<DiagnosticL
             entry.Error = status is TaskStatus.Canceled ? "Request canceled or timed out" : "Request failed";
         }
 
-        var storeTask = _storage.StoreOutgoingHttpAsync(entry);
+        var storeTask = Storage.StoreOutgoingHttpAsync(entry);
 
         if (!string.IsNullOrEmpty(entry.RequestId))
         {
@@ -205,7 +211,7 @@ public sealed class OutgoingHttpObserver : IHostedService, IObserver<DiagnosticL
         entry.Error = ex?.Message;
         entry.ExceptionType = ex?.GetType().Name;
 
-        var storeTask = _storage.StoreOutgoingHttpAsync(entry);
+        var storeTask = Storage.StoreOutgoingHttpAsync(entry);
         if (!string.IsNullOrEmpty(entry.RequestId))
         {
             _debugContext.AddOutgoingHttp(entry.RequestId, entry);
@@ -234,7 +240,7 @@ public sealed class OutgoingHttpObserver : IHostedService, IObserver<DiagnosticL
         try
         {
             var id = await storeTask.ConfigureAwait(false);
-            await _storage.UpdateOutgoingHttpResponseBodyAsync(id, body).ConfigureAwait(false);
+            await Storage.UpdateOutgoingHttpResponseBodyAsync(id, body).ConfigureAwait(false);
         }
         catch
         {
