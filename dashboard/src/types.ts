@@ -27,6 +27,7 @@ export interface RequestEntry extends EntryBase {
   ipAddress?: string | null;
   sqlQueries: SqlQueryEntry[];
   logs: LogEntry[];
+  dumps: DumpEntry[];
   exception?: string | null;
   requestSize: number;
   responseSize: number;
@@ -76,6 +77,16 @@ export interface ExceptionEntry extends EntryBase {
   targetSite?: string | null;
 }
 
+export interface DumpEntry extends EntryBase {
+  label?: string | null;
+  typeName: string;
+  json: string;
+  truncated: boolean;
+  file?: string | null;
+  line: number;
+  member?: string | null;
+}
+
 export interface PagedResult<T> {
   items: T[];
   totalCount: number;
@@ -106,6 +117,7 @@ export interface DebugStats {
   totalSqlQueries: number;
   totalExceptions: number;
   totalLogs: number;
+  totalDumps: number;
   averageResponseTime: number;
   averageSqlTime: number;
   statusCodeDistribution: Record<string, number>;
@@ -150,6 +162,6 @@ export interface PerfMetrics {
 }
 
 export interface SearchHit {
-  type: 'request' | 'query' | 'log' | 'exception';
+  type: 'request' | 'query' | 'log' | 'exception' | 'dump';
   data: Record<string, unknown>;
 }

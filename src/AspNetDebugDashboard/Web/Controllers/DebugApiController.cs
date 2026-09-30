@@ -142,6 +142,28 @@ public class DebugApiController : ControllerBase
         return Ok(exception);
     }
 
+    [HttpGet("/_debug/api/dumps")]
+    [HttpGet("/_custom-debug/api/dumps")]
+    public async Task<ActionResult<PagedResult<DumpEntry>>> GetDumps([FromQuery] DebugFilter filter)
+    {
+        if (CheckAccess() is { } deny) return deny;
+
+        var dumps = await _storage.GetDumpsAsync(filter);
+        return Ok(dumps);
+    }
+
+    [HttpGet("/_debug/api/dumps/{id}")]
+    [HttpGet("/_custom-debug/api/dumps/{id}")]
+    public async Task<ActionResult<DumpEntry>> GetDump(string id)
+    {
+        if (CheckAccess() is { } deny) return deny;
+
+        var dump = await _storage.GetDumpAsync(id);
+        if (dump == null) return NotFound();
+
+        return Ok(dump);
+    }
+
     [HttpPost("/_debug/api/logs")]
     [HttpPost("/_custom-debug/api/logs")]
     public async Task<ActionResult<string>> CreateLog([FromBody] CreateLogRequest request)
@@ -217,6 +239,7 @@ public class DebugApiController : ControllerBase
         var queries = await _storage.GetSqlQueriesAsync(new DebugFilter { PageSize = int.MaxValue });
         var logs = await _storage.GetLogsAsync(new DebugFilter { PageSize = int.MaxValue });
         var exceptions = await _storage.GetExceptionsAsync(new DebugFilter { PageSize = int.MaxValue });
+        var dumps = await _storage.GetDumpsAsync(new DebugFilter { PageSize = int.MaxValue });
 
         var exportData = new
         {
@@ -225,7 +248,8 @@ public class DebugApiController : ControllerBase
             Requests = requests.Items,
             Queries = queries.Items,
             Logs = logs.Items,
-            Exceptions = exceptions.Items
+            Exceptions = exceptions.Items,
+            Dumps = dumps.Items
         };
 
         var json = JsonSerializer.Serialize(exportData, new JsonSerializerOptions 
@@ -285,6 +309,16 @@ public class DebugApiController : ControllerBase
                 PageSize = 10 
             });
             results.AddRange(exceptions.Items.Select(e => new { Type = "exception", Data = e }));
+        }
+
+        if (types == null || types.Contains("dumps"))
+        {
+            var dumps = await _storage.GetDumpsAsync(new DebugFilter
+            {
+                Search = term,
+                PageSize = 10
+            });
+            results.AddRange(dumps.Items.Select(d => new { Type = "dump", Data = d }));
         }
 
         return Ok(results.Take(50));

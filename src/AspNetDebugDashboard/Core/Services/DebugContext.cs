@@ -56,11 +56,14 @@ public class DebugContext
         }
     }
     
-    public void AddDump(string requestId, DumpEntry dump)
+    public void AddDump(string requestId, DumpEntry dump, int maxPerRequest)
     {
         if (_requestDumps.TryGetValue(requestId, out var dumps))
         {
-            dumps.Add(dump);
+            lock (dumps)
+            {
+                if (dumps.Count < maxPerRequest) dumps.Add(dump);
+            }
         }
     }
     
