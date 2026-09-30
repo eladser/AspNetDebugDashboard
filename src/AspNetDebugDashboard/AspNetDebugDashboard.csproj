@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <TargetFrameworks>net8.0;net9.0;net10.0;net11.0</TargetFrameworks>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <PackageId>AspNetDebugDashboard</PackageId>
@@ -43,6 +43,11 @@
   <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.12" />
+  </ItemGroup>
+  <!-- RC until net11 GA (2026-11-10) -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net11.0'">
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="11.0.0-rc.1.26425.128" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="11.0.0-rc.1.26425.128" />
   </ItemGroup>
 
   <ItemGroup>
