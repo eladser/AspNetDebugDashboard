@@ -203,3 +203,147 @@ public class StorageTests : IDisposable
         _storage?.Dispose();
     }
 }
+
+public class LiteDbStorageMaintenanceTests : IDisposable
+{
+    private readonly List<string> _tempPaths = new();
+
+    private string NewTempDbPath()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"debugdash-{Guid.NewGuid():N}.db");
+        _tempPaths.Add(path);
+        return path;
+    }
+
+    private static string BigString(int size) => new string('x', size);
+
+    [Fact]
+    public async Task CleanupAsync_TrimsOutgoingHttpAndDumps()
+    {
+        var config = new DebugConfiguration { DatabasePath = ":memory:", MaxEntries = 3 };
+        using var storage = new LiteDbStorage(config.DatabasePath, config);
+
+        for (var i = 0; i < 10; i++)
+        {
+            await storage.StoreOutgoingHttpAsync(new OutgoingHttpEntry { Timestamp = DateTime.UtcNow.AddMinutes(-i) });
+            await storage.StoreDumpAsync(new DumpEntry { Timestamp = DateTime.UtcNow.AddMinutes(-i) });
+        }
+
+        await storage.CleanupAsync(3);
+
+        Assert.Equal(3, await storage.GetOutgoingHttpCountAsync());
+        Assert.Equal(3, await storage.GetDumpCountAsync());
+    }
+
+    [Fact]
+    public async Task GetDatabaseSizeAsync_MatchesMainFilePlusLogFile()
+    {
+        var dbPath = NewTempDbPath();
+        var config = new DebugConfiguration { DatabasePath = dbPath };
+        using var storage = new LiteDbStorage(dbPath, config);
+
+        for (var i = 0; i < 50; i++)
+        {
+            await storage.StoreRequestAsync(new RequestEntry { RequestBody = BigString(2000) });
+        }
+
+        var logPath = Path.Combine(
+            Path.GetDirectoryName(dbPath)!,
+            Path.GetFileNameWithoutExtension(dbPath) + "-log" + Path.GetExtension(dbPath));
+
+        var reportedSize = await storage.GetDatabaseSizeAsync();
+
+        var expectedSize = new FileInfo(dbPath).Length + (File.Exists(logPath) ? new FileInfo(logPath).Length : 0);
+
+        Assert.Equal(expectedSize, reportedSize);
+        Assert.True(reportedSize > 0);
+    }
+
+    [Fact]
+    public async Task CompactAsync_ShrinksOversizedFileDatabase()
+    {
+        var dbPath = NewTempDbPath();
+        var config = new DebugConfiguration { DatabasePath = dbPath };
+        using var storage = new LiteDbStorage(dbPath, config);
+
+        for (var i = 0; i < 300; i++)
+        {
+            await storage.StoreRequestAsync(new RequestEntry
+            {
+                RequestBody = BigString(2000),
+                Timestamp = DateTime.UtcNow.AddMinutes(-i)
+            });
+        }
+
+        await storage.OptimizeAsync();
+        var sizeBefore = await storage.GetDatabaseSizeAsync();
+
+        await storage.DeleteOldestFractionAsync(0.9);
+        await storage.CompactAsync();
+        var sizeAfter = await storage.GetDatabaseSizeAsync();
+
+        Assert.True(sizeAfter < sizeBefore, $"expected {sizeAfter} < {sizeBefore}");
+        Assert.Equal(30, await storage.GetTotalEntriesAsync());
+    }
+
+    [Fact]
+    public async Task CompactAsync_SkipsInMemoryDatabase()
+    {
+        var config = new DebugConfiguration { DatabasePath = ":memory:" };
+        using var storage = new LiteDbStorage(config.DatabasePath, config);
+
+        await storage.StoreRequestAsync(new RequestEntry());
+
+        await storage.CompactAsync(); // should not throw
+
+        Assert.Equal(1, await storage.GetTotalEntriesAsync());
+    }
+
+    [Fact]
+    public async Task ConcurrentWrites_DuringCompact_LoseNoEntriesAndDbReopens()
+    {
+        var dbPath = NewTempDbPath();
+        var config = new DebugConfiguration { DatabasePath = dbPath };
+
+        const int writerCount = 20;
+
+        using (var storage = new LiteDbStorage(dbPath, config))
+        {
+            for (var i = 0; i < 50; i++)
+            {
+                await storage.StoreRequestAsync(new RequestEntry { RequestBody = BigString(500) });
+            }
+
+            var writers = Enumerable.Range(0, writerCount)
+                .Select(_ => storage.StoreRequestAsync(new RequestEntry { RequestBody = BigString(500) }));
+
+            var compact = storage.CompactAsync();
+
+            await Task.WhenAll(writers.Cast<Task>().Append(compact));
+
+            Assert.Equal(50 + writerCount, await storage.GetTotalEntriesAsync());
+        }
+
+        using var reopened = new LiteDbStorage(dbPath, config);
+        Assert.Equal(50 + writerCount, await reopened.GetTotalEntriesAsync());
+    }
+
+    public void Dispose()
+    {
+        foreach (var path in _tempPaths)
+        {
+            try
+            {
+                if (File.Exists(path)) File.Delete(path);
+                var logPath = Path.Combine(
+                    Path.GetDirectoryName(path)!,
+                    Path.GetFileNameWithoutExtension(path) + "-log" + Path.GetExtension(path));
+                if (File.Exists(logPath)) File.Delete(logPath);
+            }
+            catch
+            {
+                // Windows file locks sometimes keep the handle open a moment after Dispose; not worth failing the run over.
+            }
+        }
+    }
+}

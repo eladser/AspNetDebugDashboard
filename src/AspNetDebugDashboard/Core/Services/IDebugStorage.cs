@@ -48,6 +48,8 @@ public interface IDebugStorage : IDisposable
     
     // Background maintenance
     Task OptimizeAsync();
+    Task CompactAsync();
+    Task DeleteOldestFractionAsync(double fraction);
     Task<long> GetDatabaseSizeAsync();
     Task<int> GetTotalEntriesAsync();
     

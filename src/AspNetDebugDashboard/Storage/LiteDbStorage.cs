@@ -18,6 +18,9 @@ public class LiteDbStorage : IDebugStorage
     private readonly DebugEventBus? _eventBus;
     private readonly string _connectionString;
     private readonly MemoryStream? _memoryStream;
+    // Writers wait on this only while a Rebuild is in flight - Rebuild needs exclusive
+    // access to the file, otherwise LiteDB corrupts the database.
+    private readonly SemaphoreSlim _rebuildGate = new(1, 1);
     private bool _disposed = false;
 
     public LiteDbStorage(string connectionString, DebugConfiguration config, DebugEventBus? eventBus = null)
@@ -76,7 +79,7 @@ public class LiteDbStorage : IDebugStorage
     public async Task<string> StoreRequestAsync(RequestEntry request)
     {
         if (_disposed) throw new ObjectDisposedException(nameof(LiteDbStorage));
-        await Task.Run(() => _requests.Insert(request));
+        await RunGatedAsync(() => _requests.Insert(request));
         _eventBus?.Publish("requests");
         return request.Id;
     }
@@ -84,7 +87,7 @@ public class LiteDbStorage : IDebugStorage
     public async Task<string> StoreSqlQueryAsync(SqlQueryEntry query)
     {
         if (_disposed) throw new ObjectDisposedException(nameof(LiteDbStorage));
-        await Task.Run(() => _sqlQueries.Insert(query));
+        await RunGatedAsync(() => _sqlQueries.Insert(query));
         _eventBus?.Publish("sqlQueries");
         return query.Id;
     }
@@ -92,7 +95,7 @@ public class LiteDbStorage : IDebugStorage
     public async Task<string> StoreLogAsync(LogEntry log)
     {
         if (_disposed) throw new ObjectDisposedException(nameof(LiteDbStorage));
-        await Task.Run(() => _logs.Insert(log));
+        await RunGatedAsync(() => _logs.Insert(log));
         _eventBus?.Publish("logs");
         return log.Id;
     }
@@ -100,7 +103,7 @@ public class LiteDbStorage : IDebugStorage
     public async Task<string> StoreExceptionAsync(ExceptionEntry exception)
     {
         if (_disposed) throw new ObjectDisposedException(nameof(LiteDbStorage));
-        await Task.Run(() => _exceptions.Insert(exception));
+        await RunGatedAsync(() => _exceptions.Insert(exception));
         _eventBus?.Publish("exceptions");
         return exception.Id;
     }
@@ -108,7 +111,7 @@ public class LiteDbStorage : IDebugStorage
     public async Task<string> StoreOutgoingHttpAsync(OutgoingHttpEntry entry)
     {
         if (_disposed) throw new ObjectDisposedException(nameof(LiteDbStorage));
-        await Task.Run(() => _outgoingHttp.Insert(entry));
+        await RunGatedAsync(() => _outgoingHttp.Insert(entry));
         _eventBus?.Publish("outgoingHttp");
         return entry.Id;
     }
@@ -116,7 +119,7 @@ public class LiteDbStorage : IDebugStorage
     public async Task<string> StoreDumpAsync(DumpEntry entry)
     {
         if (_disposed) throw new ObjectDisposedException(nameof(LiteDbStorage));
-        await Task.Run(() => _dumps.Insert(entry));
+        await RunGatedAsync(() => _dumps.Insert(entry));
         _eventBus?.Publish("dumps");
         return entry.Id;
     }
@@ -166,7 +169,7 @@ public class LiteDbStorage : IDebugStorage
     public async Task<bool> DeleteOutgoingHttpAsync(string id)
     {
         if (_disposed) throw new ObjectDisposedException(nameof(LiteDbStorage));
-        return await Task.Run(() => _outgoingHttp.Delete(id));
+        return await RunGatedAsync(() => _outgoingHttp.Delete(id));
     }
 
     public async Task<PagedResult<DumpEntry>> GetDumpsAsync(DebugFilter filter)
@@ -214,7 +217,7 @@ public class LiteDbStorage : IDebugStorage
     public async Task<bool> DeleteDumpAsync(string id)
     {
         if (_disposed) throw new ObjectDisposedException(nameof(LiteDbStorage));
-        return await Task.Run(() => _dumps.Delete(id));
+        return await RunGatedAsync(() => _dumps.Delete(id));
     }
 
     public async Task<PagedResult<RequestEntry>> GetRequestsAsync(DebugFilter filter)
@@ -483,19 +486,22 @@ public class LiteDbStorage : IDebugStorage
     public async Task CleanupAsync(int maxEntries)
     {
         if (_disposed) throw new ObjectDisposedException(nameof(LiteDbStorage));
-        await Task.Run(() =>
+        await RunGatedAsync(() =>
         {
             CleanupCollection(_requests, maxEntries);
             CleanupCollection(_sqlQueries, maxEntries);
             CleanupCollection(_logs, maxEntries);
             CleanupCollection(_exceptions, maxEntries);
+            CleanupCollection(_outgoingHttp, maxEntries);
+            CleanupCollection(_dumps, maxEntries);
+            return true;
         });
     }
 
     public async Task ClearAllAsync()
     {
         if (_disposed) throw new ObjectDisposedException(nameof(LiteDbStorage));
-        await Task.Run(() =>
+        await RunGatedAsync(() =>
         {
             _requests.DeleteAll();
             _sqlQueries.DeleteAll();
@@ -503,6 +509,7 @@ public class LiteDbStorage : IDebugStorage
             _exceptions.DeleteAll();
             _outgoingHttp.DeleteAll();
             _dumps.DeleteAll();
+            return true;
         });
     }
 
@@ -648,7 +655,7 @@ public class LiteDbStorage : IDebugStorage
     public async Task<int> BulkDeleteAsync(string[] ids, string type)
     {
         if (_disposed) throw new ObjectDisposedException(nameof(LiteDbStorage));
-        return await Task.Run(() =>
+        return await RunGatedAsync(() =>
         {
             var deleted = 0;
             foreach (var id in ids)
@@ -670,21 +677,25 @@ public class LiteDbStorage : IDebugStorage
     public async Task<int> DeleteOlderThanAsync(DateTime cutoff)
     {
         if (_disposed) throw new ObjectDisposedException(nameof(LiteDbStorage));
-        return await Task.Run(() =>
+        return await RunGatedAsync(() =>
         {
             var deleted = 0;
             deleted += _requests.DeleteMany(x => x.Timestamp < cutoff);
             deleted += _sqlQueries.DeleteMany(x => x.Timestamp < cutoff);
             deleted += _logs.DeleteMany(x => x.Timestamp < cutoff);
             deleted += _exceptions.DeleteMany(x => x.Timestamp < cutoff);
+            deleted += _outgoingHttp.DeleteMany(x => x.Timestamp < cutoff);
+            deleted += _dumps.DeleteMany(x => x.Timestamp < cutoff);
             return deleted;
         });
     }
 
+    // ---- Maintenance region: compaction, size accounting, retention cleanup ----
+
     public async Task OptimizeAsync()
     {
         if (_disposed) throw new ObjectDisposedException(nameof(LiteDbStorage));
-        
+
         // Skip optimization for in-memory databases to prevent corruption during tests
         if (_memoryStream != null)
         {
@@ -692,18 +703,46 @@ public class LiteDbStorage : IDebugStorage
             return;
         }
 
-        await Task.Run(() =>
+        // No longer swallows Checkpoint errors - the caller (DebugDashboardCleanupService)
+        // logs and moves on to the next cycle.
+        await RunGatedAsync(() => { _database.Checkpoint(); return true; });
+    }
+
+    public async Task CompactAsync()
+    {
+        if (_disposed) throw new ObjectDisposedException(nameof(LiteDbStorage));
+
+        // Skip for in-memory databases - there's no file to shrink and Rebuild on a
+        // MemoryStream-backed database isn't worth the risk.
+        if (_memoryStream != null) return;
+
+        await _rebuildGate.WaitAsync();
+        try
         {
-            try
+            await Task.Run(() =>
             {
-                // Only attempt optimization for file-based databases
                 _database.Checkpoint();
-            }
-            catch (Exception)
-            {
-                // Ignore optimization errors to prevent test failures
-                // In production, this might want to be logged
-            }
+                _database.Rebuild();
+            });
+        }
+        finally
+        {
+            _rebuildGate.Release();
+        }
+    }
+
+    public async Task DeleteOldestFractionAsync(double fraction)
+    {
+        if (_disposed) throw new ObjectDisposedException(nameof(LiteDbStorage));
+        await RunGatedAsync(() =>
+        {
+            DeleteOldestFractionFromCollection(_requests, fraction);
+            DeleteOldestFractionFromCollection(_sqlQueries, fraction);
+            DeleteOldestFractionFromCollection(_logs, fraction);
+            DeleteOldestFractionFromCollection(_exceptions, fraction);
+            DeleteOldestFractionFromCollection(_outgoingHttp, fraction);
+            DeleteOldestFractionFromCollection(_dumps, fraction);
+            return true;
         });
     }
 
@@ -715,14 +754,42 @@ public class LiteDbStorage : IDebugStorage
             // For in-memory databases, return the memory stream length
             if (_memoryStream != null)
                 return _memoryStream.Length;
-                
+
             var filePath = _connectionString.Replace("Filename=", "");
+            long size = 0;
+
             if (File.Exists(filePath))
-            {
-                return new FileInfo(filePath).Length;
-            }
-            return 0;
+                size += new FileInfo(filePath).Length;
+
+            // LiteDB keeps uncommitted pages in a "-log.db" file next to the main one.
+            // Deleting the .db without it corrupts the database, and skipping it here
+            // is how the old size check used to undercount things.
+            var logPath = GetLogFilePath(filePath);
+            if (File.Exists(logPath))
+                size += new FileInfo(logPath).Length;
+
+            return size;
         });
+    }
+
+    private static string GetLogFilePath(string dbPath)
+    {
+        var dir = Path.GetDirectoryName(dbPath);
+        var name = Path.GetFileNameWithoutExtension(dbPath) + "-log" + Path.GetExtension(dbPath);
+        return string.IsNullOrEmpty(dir) ? name : Path.Combine(dir, name);
+    }
+
+    private async Task<T> RunGatedAsync<T>(Func<T> action)
+    {
+        await _rebuildGate.WaitAsync();
+        try
+        {
+            return await Task.Run(action);
+        }
+        finally
+        {
+            _rebuildGate.Release();
+        }
     }
 
     public async Task<int> GetTotalEntriesAsync()
@@ -779,6 +846,25 @@ public class LiteDbStorage : IDebugStorage
         }
     }
 
+    private static void DeleteOldestFractionFromCollection<T>(ILiteCollection<T> collection, double fraction) where T : DebugEntry
+    {
+        var count = collection.Count();
+        var toDelete = (int)(count * fraction);
+        if (toDelete <= 0) return;
+
+        var oldestIds = collection.Query()
+            .OrderBy(x => x.Timestamp)
+            .Limit(toDelete)
+            .ToList()
+            .Select(x => x.Id)
+            .ToList();
+
+        foreach (var id in oldestIds)
+        {
+            collection.Delete(id);
+        }
+    }
+
     public void Dispose()
     {
         if (!_disposed)
@@ -786,6 +872,7 @@ public class LiteDbStorage : IDebugStorage
             _disposed = true;
             _database?.Dispose();
             _memoryStream?.Dispose();
+            _rebuildGate.Dispose();
         }
     }
 }
