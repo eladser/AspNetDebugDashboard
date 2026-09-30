@@ -443,7 +443,7 @@ tbody tr.sel td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
 td.primary { color: var(--text); }
 td.num, th.num { text-align: right; }
 td.num { font-variant-numeric: tabular-nums; }
-td.dim { color: var(--faint); }
+td.dim, .dim { color: var(--faint); }
 th.fit, td.fit { width: 1%; }
 
 /* duration cell: number + proportional bar underneath */
@@ -875,6 +875,45 @@ pre.code {
 .sql-str { color: var(--warn); }
 .sql-num { color: var(--info); }
 .sql-param { color: var(--ok); }
+
+/* json tree */
+.json-tree {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  background: var(--inset);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  overflow: auto;
+  max-height: 420px;
+}
+
+.jv-indent {
+  margin-left: 7px;
+  padding-left: 9px;
+  border-left: 1px solid var(--border);
+}
+
+.jv-row { white-space: nowrap; }
+.jv-key { color: var(--info); }
+.jv-str { color: var(--warn); }
+.jv-num { color: var(--accent); }
+.jv-bool { color: var(--ok); }
+.jv-null { color: var(--faint); }
+.jv-punc { color: var(--faint); }
+.jv-collapsed { color: var(--faint); font-style: italic; padding: 0 3px; }
+
+.jv-toggle {
+  background: none;
+  border: 0;
+  color: var(--faint);
+  cursor: pointer;
+  padding: 0 3px 0 0;
+  font-size: 9px;
+  vertical-align: 1px;
+}
+.jv-toggle:hover { color: var(--text); }
 
 .copy-btn {
   position: absolute;

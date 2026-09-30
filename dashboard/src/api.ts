@@ -1,5 +1,6 @@
 import type {
   DebugStats,
+  DumpEntry,
   ExceptionEntry,
   ListQuery,
   LogEntry,
@@ -62,6 +63,10 @@ export const api = {
   exceptions: (q: ListQuery, signal?: AbortSignal) =>
     getJson<PagedResult<ExceptionEntry>>(listUrl('exceptions', q), signal),
   exception: (id: string) => getJson<ExceptionEntry>(`${apiBase}/exceptions/${id}`),
+
+  dumps: (q: ListQuery, signal?: AbortSignal) =>
+    getJson<PagedResult<DumpEntry>>(listUrl('dumps', q), signal),
+  dump: (id: string) => getJson<DumpEntry>(`${apiBase}/dumps/${id}`),
 
   performance: (signal?: AbortSignal) => getJson<PerfMetrics>(`${apiBase}/performance`, signal),
 
