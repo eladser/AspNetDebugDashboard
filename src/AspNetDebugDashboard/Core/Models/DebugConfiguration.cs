@@ -10,7 +10,8 @@ public class DebugConfiguration
     public bool LogResponseBodies { get; set; } = false;
     public bool LogSqlQueries { get; set; } = true;
     public bool LogExceptions { get; set; } = true;
-    [Obsolete("Has no effect. The dashboard polls the API.")]
+    // Toggles the /api/stream SSE endpoint. When false the endpoint 404s and the UI
+    // falls back to polling.
     public bool EnableRealTimeUpdates { get; set; } = true;
     public List<string> ExcludedPaths { get; set; } = new() { "/_debug", "/favicon.ico", "/robots.txt" };
     public List<string> ExcludedHeaders { get; set; } = new()

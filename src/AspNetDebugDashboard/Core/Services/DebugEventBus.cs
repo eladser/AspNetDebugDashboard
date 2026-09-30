@@ -10,6 +10,8 @@ public class DebugEventBus
 {
     private readonly ConcurrentDictionary<Channel<string>, byte> _subscribers = new();
 
+    internal int SubscriberCount => _subscribers.Count;
+
     public Channel<string> Subscribe()
     {
         var channel = Channel.CreateBounded<string>(new BoundedChannelOptions(100)

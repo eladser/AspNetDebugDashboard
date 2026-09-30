@@ -1,7 +1,10 @@
 using AspNetDebugDashboard.Core.Models;
 using AspNetDebugDashboard.Core.Services;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
 
@@ -13,12 +16,21 @@ public class DebugApiController : ControllerBase
     private readonly IDebugStorage _storage;
     private readonly DebugConfiguration _config;
     private readonly IWebHostEnvironment? _env;
+    private readonly DebugEventBus _eventBus;
+    private readonly IHostApplicationLifetime? _lifetime;
 
-    public DebugApiController(IDebugStorage storage, IOptions<DebugConfiguration> config, IWebHostEnvironment? env = null)
+    public DebugApiController(
+        IDebugStorage storage,
+        IOptions<DebugConfiguration> config,
+        IWebHostEnvironment? env = null,
+        DebugEventBus? eventBus = null,
+        IHostApplicationLifetime? lifetime = null)
     {
         _storage = storage ?? throw new ArgumentNullException(nameof(storage));
         _config = config?.Value ?? throw new ArgumentNullException(nameof(config));
         _env = env;
+        _eventBus = eventBus ?? new DebugEventBus();
+        _lifetime = lifetime;
     }
 
     // NotFound() when the dashboard isn't active or the request came in on the wrong path,
@@ -431,6 +443,73 @@ public class DebugApiController : ControllerBase
         };
 
         return Ok(health);
+    }
+
+    [HttpGet("/_debug/api/stream")]
+    [HttpGet("/_custom-debug/api/stream")]
+    public async Task Stream(CancellationToken cancellationToken)
+    {
+        if (!_config.EnableRealTimeUpdates)
+        {
+            HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        if (CheckAccess() is { } deny)
+        {
+            await deny.ExecuteResultAsync(ControllerContext);
+            return;
+        }
+
+        var response = HttpContext.Response;
+        response.ContentType = "text/event-stream";
+        response.Headers["Cache-Control"] = "no-cache";
+        response.Headers["X-Accel-Buffering"] = "no";
+        HttpContext.Features.Get<IHttpResponseBodyFeature>()?.DisableBuffering();
+
+        using var linked = _lifetime != null
+            ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.ApplicationStopping)
+            : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var token = linked.Token;
+
+        var channel = _eventBus.Subscribe();
+        try
+        {
+            await response.WriteAsync("retry: 5000\n\n", token);
+            await response.Body.FlushAsync(token);
+
+            while (!token.IsCancellationRequested)
+            {
+                using var waitCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+                waitCts.CancelAfter(TimeSpan.FromSeconds(15));
+
+                string? type;
+                try
+                {
+                    type = await channel.Reader.ReadAsync(waitCts.Token);
+                }
+                catch (OperationCanceledException) when (!token.IsCancellationRequested)
+                {
+                    // 15s elapsed without a new entry, send a keepalive
+                    type = null;
+                }
+
+                if (token.IsCancellationRequested) break;
+
+                await response.WriteAsync(
+                    type != null ? $"event: entry\ndata: {{\"type\":\"{type}\"}}\n\n" : "event: ping\ndata: {}\n\n",
+                    token);
+                await response.Body.FlushAsync(token);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // client disconnected or the app is shutting down
+        }
+        finally
+        {
+            _eventBus.Unsubscribe(channel);
+        }
     }
 
     private static double GetMedian(List<double> values)

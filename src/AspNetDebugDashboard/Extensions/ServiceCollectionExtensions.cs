@@ -54,9 +54,7 @@ public static class ServiceCollectionExtensions
             options.CleanupInterval = config.CleanupInterval;
             options.MaxDatabaseSize = config.MaxDatabaseSize;
             options.EmitActivities = config.EmitActivities;
-#pragma warning disable CS0618
             options.EnableRealTimeUpdates = config.EnableRealTimeUpdates;
-#pragma warning restore CS0618
             options.CaptureOutgoingHttp = config.CaptureOutgoingHttp;
             options.CaptureOutgoingHttpBodies = config.CaptureOutgoingHttpBodies;
             options.MaxOutgoingBodySize = config.MaxOutgoingBodySize;
