@@ -47,6 +47,20 @@ Failed queries get an `Error` status with the message.
 
 Spans are back-dated to the operation the dashboard already timed, so durations in your backend match what the dashboard shows.
 
+## Outgoing HTTP calls
+
+Outgoing HTTP capture (2.4) doesn't emit spans. The runtime already does: `System.Net.Http` creates a client span for every `HttpClient` request, and `AddHttpClientInstrumentation()` (or `.AddSource("System.Net.Http")` on .NET 9+) sends them to your tracer. A second span from the dashboard would only duplicate it.
+
+What the dashboard does store is the trace id of each call, shown in the Outgoing detail, so you can find the matching span in your backend.
+
+Capture listens to the same diagnostic events the runtime uses for trace propagation. If you set `System.Net.Http.EnableActivityPropagation` to `false` (the AppContext switch, or the `DOTNET_SYSTEM_NET_HTTP_ENABLEACTIVITYPROPAGATION` environment variable), those events stop and nothing shows up in the Outgoing tab. See [TROUBLESHOOTING.md](TROUBLESHOOTING.md#outgoing-http-calls-dont-show-up).
+
+## ASP.NET Core 11
+
+On .NET 11, ASP.NET Core's own hosting activity (`Microsoft.AspNetCore.Hosting.HttpRequestIn`) carries the standard HTTP semantic-convention tags (`http.request.method`, `url.path`, `http.route`, `http.response.status_code`) by itself. The dashboard's request spans use the same names, so queries and filters in your backend work across both.
+
+If you trace ASP.NET Core and add the `AspNetDebugDashboard` source, you get two server spans per request: the framework's and the dashboard's. That's expected. The dashboard's span is useful for `debug.request_id` and `debug.sql_query_count`; if you don't need those, leave the source out or set `EmitActivities = false`.
+
 ## Turning it off
 
 ```csharp

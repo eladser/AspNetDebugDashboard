@@ -35,6 +35,17 @@ builder.Services.AddDebugDashboard(config =>
     "ExcludedHeaders": ["Authorization", "Cookie", "Set-Cookie", "X-Api-Key", "X-Auth-Token", "Proxy-Authorization"],
     "MaxBodySize": 1048576,
     "RetentionPeriod": "7.00:00:00",
+    "CleanupInterval": "01:00:00",
+    "MaxDatabaseSize": 104857600,
+    "EnableRealTimeUpdates": true,
+    "CaptureOutgoingHttp": true,
+    "CaptureOutgoingHttpBodies": false,
+    "MaxOutgoingBodySize": 65536,
+    "CaptureUnattachedOutgoingHttp": false,
+    "DumpMaxDepth": 6,
+    "DumpMaxItems": 100,
+    "DumpMaxSize": 65536,
+    "MaxDumpsPerRequest": 50,
     "EnablePerformanceCounters": true,
     "EnableDetailedSqlLogging": true,
     "AllowDataExport": true,
@@ -66,7 +77,8 @@ builder.Services.AddDebugDashboard();
 | `IsEnabled` | `bool` | `true` | Enable/disable the debug dashboard |
 | `DatabasePath` | `string` | `"debug-dashboard.db"` | Path to LiteDB database file |
 | `BasePath` | `string` | `"/_debug"` | Base URL path for the dashboard |
-| `MaxEntries` | `int` | `1000` | Maximum number of entries to keep |
+| `MaxEntries` | `int` | `1000` | Maximum entries kept per entry type (requests, queries, logs, exceptions, outgoing calls, dumps each count separately) |
+| `EnableRealTimeUpdates` | `bool` | `true` | Serve live updates on `/api/stream`. When false the endpoint returns 404 and the UI polls every 5 seconds |
 
 ### Logging Settings
 
@@ -107,8 +119,43 @@ builder.Services.AddDebugDashboard();
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `RetentionPeriod` | `TimeSpan` | `7 days` | How long to keep debug data |
+| `RetentionPeriod` | `TimeSpan` | `7 days` | Entries older than this are deleted on each cleanup run |
+| `CleanupInterval` | `TimeSpan?` | `1 hour` | How often cleanup runs. `null` means 1 hour |
+| `MaxDatabaseSize` | `long` | `104857600` (100MB) | Size cap for the database file plus its `-log.db` file. Also the health check's warning threshold |
 | `TimeZone` | `string` | `"UTC"` | Time zone for displaying timestamps |
+
+### How cleanup works
+
+A background service runs every `CleanupInterval`, only in environments where the dashboard is active. Each run:
+
+1. Deletes entries older than `RetentionPeriod`.
+2. Trims each entry type to its newest `MaxEntries`.
+3. Checkpoints the LiteDB log and measures the database file plus `-log.db`.
+4. If that's over `MaxDatabaseSize`, deletes the oldest 25% of every entry type and compacts the file. It repeats up to four times, then logs a warning if the file is still too big.
+
+Compaction rebuilds the file in place, so writes pause briefly while it runs. Files are never deleted, and `:memory:` databases skip compaction. Errors in a run are logged and the next run goes ahead as normal. `POST /_debug/api/cleanup` trims to `MaxEntries` on demand.
+
+### Outgoing HTTP Settings
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `CaptureOutgoingHttp` | `bool` | `true` | Record calls made through `HttpClient` (any instance, not only `IHttpClientFactory`) |
+| `CaptureOutgoingHttpBodies` | `bool` | `false` | Also store request and response bodies. Request bodies are read only when already buffered (`StringContent`, `JsonContent`, form content); streamed bodies are skipped |
+| `MaxOutgoingBodySize` | `int` | `65536` (64KB) | Bodies are cut off past this size |
+| `CaptureUnattachedOutgoingHttp` | `bool` | `false` | Record calls made outside a request (background services, startup). Off by default, which also keeps an OTLP exporter's own traffic out of the list |
+
+`ExcludedHeaders` applies to outgoing headers. URL userinfo is always stripped, and query parameters whose names match `RedactedBodyFields` are stored as `***`, same as bodies.
+
+### Dump Settings
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `DumpMaxDepth` | `int` | `6` | Nesting depth before a branch is replaced with a placeholder |
+| `DumpMaxItems` | `int` | `100` | Items (or properties) per level before the rest are dropped |
+| `DumpMaxSize` | `int` | `65536` (64KB) | Maximum size of the stored JSON |
+| `MaxDumpsPerRequest` | `int` | `50` | Dumps attached to one request's detail. Extra dumps are still stored and show in the Dumps tab |
+
+A dump that hits any limit is flagged as truncated in the UI.
 
 ### Telemetry Settings
 

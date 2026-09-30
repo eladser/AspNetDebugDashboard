@@ -8,7 +8,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-support-ff5e5b?logo=kofi&logoColor=white)](https://ko-fi.com/eladser)
 
-Request, SQL query, log, and exception capture for ASP.NET Core, viewable in a dashboard at `/_debug`, and the hub of a small suite of local-first dev tools. Think Laravel Telescope, but for .NET.
+Request, SQL query, outgoing HTTP, log, and exception capture for ASP.NET Core, viewable in a dashboard at `/_debug`, and the hub of a small suite of local-first dev tools. Think Laravel Telescope, but for .NET.
 
 Everything is stored locally in a LiteDB file. The dashboard ships inside the package as a single self-contained page, so there are no CDN dependencies and it works offline.
 
@@ -22,7 +22,7 @@ The dashboard is the hub of a set of local-first dev tools that follow the same 
 
 | Package | NuGet | Route | What it does |
 | --- | --- | --- | --- |
-| [AspNetDebugDashboard](src/AspNetDebugDashboard/) | [![NuGet](https://img.shields.io/nuget/v/AspNetDebugDashboard.svg)](https://www.nuget.org/packages/AspNetDebugDashboard/) | `/_debug` | Request, SQL, log, and exception capture (this package). |
+| [AspNetDebugDashboard](src/AspNetDebugDashboard/) | [![NuGet](https://img.shields.io/nuget/v/AspNetDebugDashboard.svg)](https://www.nuget.org/packages/AspNetDebugDashboard/) | `/_debug` | Request, SQL, outgoing HTTP, log, exception, and dump capture (this package). |
 | [AspNetMailbox](src/AspNetMailbox/) | [![NuGet](https://img.shields.io/nuget/v/AspNetMailbox.svg)](https://www.nuget.org/packages/AspNetMailbox/) | `/_mailbox` | Captures outbound email in-process and previews it (HTML, text, headers, attachments). No mail server. |
 | [AspNetFlags](src/AspNetFlags/) | [![NuGet](https://img.shields.io/nuget/v/AspNetFlags.svg)](https://www.nuget.org/packages/AspNetFlags/) | `/_flags` | Feature flags with a toggle UI. Flags appear the first time your code checks them. |
 | [AspNetJobs](src/AspNetJobs/) | [![NuGet](https://img.shields.io/nuget/v/AspNetJobs.svg)](https://www.nuget.org/packages/AspNetJobs/) | `/_jobs` | Background jobs that run in-process, with a live inspector showing status, timing, and stack traces. |
@@ -39,7 +39,7 @@ dotnet add package AspNetDebugDashboard
 Or in the project file:
 
 ```xml
-<PackageReference Include="AspNetDebugDashboard" Version="2.2.0" />
+<PackageReference Include="AspNetDebugDashboard" Version="2.4.0" />
 ```
 
 Or from the Package Manager Console in Visual Studio:
@@ -48,7 +48,7 @@ Or from the Package Manager Console in Visual Studio:
 Install-Package AspNetDebugDashboard
 ```
 
-Works on .NET 8, 9, and 10. No other setup files, schemas, or services needed. Storage is an embedded LiteDB database created on first run.
+Works on .NET 8, 9, 10, and 11. No other setup files, schemas, or services needed. Storage is an embedded LiteDB database created on first run.
 
 ## Setup
 
@@ -108,16 +108,39 @@ await DebugLogger.InfoAsync("Cache warmed", tag: "startup");
 
 Entries written during a request are attached to it, so the request detail shows the logs and queries it produced.
 
+### Dump a value
+
+`DebugDump.Dump` snapshots any object at the call site and shows it as a JSON tree in the Dumps tab, with the file and line it came from:
+
+```csharp
+using AspNetDebugDashboard;
+
+var order = await orders.CreateAsync(req);
+DebugDump.Dump(order, "created order");
+```
+
+It's a static call, so it works in code with no DI or `HttpContext`. Inside a request the dump is attached to that request. The snapshot is taken right away and cut off at `DumpMaxDepth` (6), `DumpMaxItems` (100 items or properties per level), and `DumpMaxSize` (64 KB). Cycles are marked rather than followed, and properties matching `RedactedBodyFields` show as `***`. When the dashboard isn't active (Production, by default) the call returns immediately and does nothing.
+
+### Outgoing HTTP
+
+Calls your app makes through `HttpClient` are captured with no setup. That covers `new HttpClient()`, `IHttpClientFactory`, and SDK clients built on top of them, since capture hooks the runtime's own diagnostic events rather than a handler you register. Each call records method, URL, status, timing, and headers, and links back to the inbound request that made it. `ExcludedHeaders` and `RedactedBodyFields` apply here too.
+
+Bodies are off by default. Turn them on with `CaptureOutgoingHttpBodies = true` (capped at `MaxOutgoingBodySize`, 64 KB). Calls made outside a request, from a background service say, are skipped unless you set `CaptureUnattachedOutgoingHttp = true`.
+
 ## The dashboard
 
 | | |
 |---|---|
 | **Overview** | totals, error rate, status/method distribution, slowest requests and queries |
 | **Performance** | req/min, avg, median, P95/P99, error rate, slowest endpoints (last hour) |
-| **Requests** | sortable table with duration bars; detail has Summary / Headers / Request / Response / SQL / Logs tabs and a **copy-as-cURL** button |
+| **Requests** | sortable table with duration bars; detail has Summary / Headers / Request / Response / SQL / HTTP / Logs / Dumps tabs and a **copy-as-cURL** button |
 | **Queries** | full SQL with syntax highlighting, parameters, timing; slow queries flagged; an **N+1 warning** appears when one request runs the same query 3+ times |
+| **Outgoing** | HTTP calls your app made: method, URL, status, timing, request and response headers, bodies if enabled; failed-only and host filters |
 | **Logs** | level, category, structured properties, stack traces |
 | **Exceptions** | type, message, full stack trace, inner exceptions, the route that threw |
+| **Dumps** | `DebugDump.Dump()` snapshots as collapsible JSON trees, with source file and line |
+
+Lists update live as entries come in, over a server-sent event stream. If the stream can't connect it falls back to polling every 5 seconds (behind a proxy? see [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)). The **live** button in the header pauses it.
 
 Global search (`Ctrl+K`) covers everything. Tables navigate from the keyboard: `j`/`k` rows, `Enter` open, `/` filter, `Esc` close. Queries, logs, and exceptions link back to their parent request.
 
@@ -147,6 +170,17 @@ builder.Services.AddDebugDashboard(options =>
     options.AllowedEnvironments = new() { "Development" }; // "*" allows every environment
     options.AuthorizationFilter = null;        // Func<HttpContext, bool>, applied to UI + API
     options.RetentionPeriod = TimeSpan.FromDays(7);
+    options.CleanupInterval = TimeSpan.FromHours(1);
+    options.MaxDatabaseSize = 100 * 1024 * 1024; // oldest entries go first when the file grows past this
+    options.EnableRealTimeUpdates = true;      // live updates over SSE; false means the UI polls
+    options.CaptureOutgoingHttp = true;
+    options.CaptureOutgoingHttpBodies = false;
+    options.MaxOutgoingBodySize = 64 * 1024;
+    options.CaptureUnattachedOutgoingHttp = false; // calls made outside a request
+    options.DumpMaxDepth = 6;
+    options.DumpMaxItems = 100;
+    options.DumpMaxSize = 64 * 1024;
+    options.MaxDumpsPerRequest = 50;
 });
 ```
 
@@ -180,14 +214,14 @@ builder.Services.AddOpenTelemetry()
         .AddOtlpExporter());
 ```
 
-The spans carry the request id, status, SQL text, and timing. They cost nothing until you add the source (no listener, no span), so the default is fine to leave on. Set `EmitActivities = false` to turn it off entirely. Details in [docs/OPENTELEMETRY.md](docs/OPENTELEMETRY.md).
+The spans carry the request id, status, SQL text, and timing. They cost nothing until you add the source (no listener, no span), so the default is fine to leave on. Set `EmitActivities = false` to turn it off entirely. Outgoing HTTP calls don't get spans of their own here, because `System.Net.Http` already emits them. Details in [docs/OPENTELEMETRY.md](docs/OPENTELEMETRY.md).
 
 ## MCP server for AI agents
 
 [![NuGet](https://img.shields.io/nuget/v/AspNetDebugDashboard.Mcp.svg?label=AspNetDebugDashboard.Mcp)](https://www.nuget.org/packages/AspNetDebugDashboard.Mcp/)
 [![Downloads](https://img.shields.io/nuget/dt/AspNetDebugDashboard.Mcp.svg)](https://www.nuget.org/packages/AspNetDebugDashboard.Mcp/)
 
-`AspNetDebugDashboard.Mcp` is a separate dotnet tool that exposes the captured data to a coding agent over MCP, so it can read recent requests, the SQL a request ran, recent failures, and performance numbers while it works on your app. If you've installed the rest of the suite, it can also read your feature flags, background jobs, vitals, and captured mail.
+`AspNetDebugDashboard.Mcp` is a separate dotnet tool that exposes the captured data to a coding agent over MCP, so it can read recent requests, the SQL a request ran, outgoing HTTP calls, dumps, recent failures, and performance numbers while it works on your app. If you've installed the rest of the suite, it can also read your feature flags, background jobs, vitals, and captured mail.
 
 ```bash
 dotnet tool install --global AspNetDebugDashboard.Mcp
@@ -240,6 +274,9 @@ The dashboard is a client of a plain JSON API you can also call directly:
 | `GET /_debug/api/queries` | paged SQL queries; supports `search`, `isSlowQuery`, `isSuccessful` |
 | `GET /_debug/api/logs` | paged logs; supports `search`, `level` |
 | `GET /_debug/api/exceptions` | paged exceptions |
+| `GET /_debug/api/http-requests` | paged outgoing HTTP calls; supports `search`, `host`, `isSuccessful`, `requestId` |
+| `GET /_debug/api/dumps` | paged dumps; supports `search`, `requestId` |
+| `GET /_debug/api/stream` | server-sent events, one `entry` event per stored entry |
 | `GET /_debug/api/performance` | last-hour metrics (P95/P99, error rate, slowest endpoints) |
 | `GET /_debug/api/search?term=` | cross-type search |
 | `GET /_debug/api/export` | everything as a JSON file |
@@ -260,7 +297,10 @@ dotnet run --project samples/SampleApp --urls http://localhost:5000
 curl http://localhost:5000/api/products
 curl http://localhost:5000/api/products/slow-operation
 curl http://localhost:5000/api/products/test-error
+curl http://localhost:5000/api/externalapi/zen     # outgoing call to api.github.com
 ```
+
+`POST /api/orders` calls `DebugDump.Dump` on the order it creates. The demo gif above is recorded against this app by [docs/capture-demo.mjs](docs/capture-demo.mjs).
 
 ## How the dashboard is built
 
