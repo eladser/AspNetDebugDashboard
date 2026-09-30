@@ -10,9 +10,9 @@ Existing setup is unchanged unless you implement `IDebugStorage` yourself (see C
 - `net11.0` target, alongside `net8.0`, `net9.0`, and `net10.0`. EF Core 11 on that target. `AspNetDebugDashboard.Mcp` also targets `net11.0`.
 - Outgoing HTTP capture. Calls made through any `HttpClient` (`new HttpClient()`, `IHttpClientFactory`, SDK clients built on it) are recorded through the runtime's `HttpHandlerDiagnosticListener`, with method, URL, status, timing, headers, and the inbound request they belong to. `ExcludedHeaders` applies to them, URL userinfo is stripped, and query parameters matching `RedactedBodyFields` are stored as `***`. Bodies are opt-in (`CaptureOutgoingHttpBodies`) and capped at `MaxOutgoingBodySize`. Retries show up as one entry per attempt. New Outgoing tab, an HTTP tab in request detail, `GET /api/http-requests` (and `/{id}`), and MCP `recent_outgoing_http`.
 - `DebugDump.Dump(value, label)`: snapshots any object as a JSON tree at the call site, with file, line, and member. Cycles are marked, getter exceptions are stored as strings, and redacted field names are masked. Limited by `DumpMaxDepth`, `DumpMaxItems`, and `DumpMaxSize` (truncated dumps are flagged). Dumps taken during a request are attached to it, up to `MaxDumpsPerRequest`. A no-op unless the dashboard is active. New Dumps tab, a Dumps tab in request detail, `GET /api/dumps` (and `/{id}`), and MCP `recent_dumps`.
-- Live updates over server-sent events at `GET /api/stream`. The dashboard refreshes when an entry is stored instead of polling every few seconds, and falls back to polling if the stream can't open or goes quiet.
+- Live updates over server-sent events at `GET /api/stream`. The dashboard refreshes when an entry is stored instead of polling every few seconds, throttled to one refresh per second with a trailing refresh so a burst's last rows still show up, and falls back to polling if the stream can't open or goes quiet.
 - Options, with defaults: `CaptureOutgoingHttp` (true), `CaptureOutgoingHttpBodies` (false), `MaxOutgoingBodySize` (64 KB), `CaptureUnattachedOutgoingHttp` (false), `DumpMaxDepth` (6), `DumpMaxItems` (100), `DumpMaxSize` (64 KB), `MaxDumpsPerRequest` (50).
-- Stats, search, export, and clear include dumps and outgoing calls.
+- Stats, search, export, clear, and bulk delete include dumps and outgoing calls.
 
 ### Changed
 - `AspNetDebugDashboard.Mcp` runs on ModelContextProtocol 2.x (2.2.0). Microsoft.Extensions.Hosting and Microsoft.Extensions.Http bumped to 10.0.12 to match. Every tool now advertises an input schema, including parameterless ones.
@@ -31,6 +31,8 @@ Existing setup is unchanged unless you implement `IDebugStorage` yourself (see C
 - Per-request capture lists are thread-safe, so parallel work inside one request (outgoing calls, dumps, logs, queries) no longer races.
 - Capturing outgoing response bodies keeps the original `Content-Length`.
 - Dumps never block on `Task.Result` and never enumerate an `IQueryable`, so dumping a pending task or an EF query doesn't hang or run SQL.
+- `DebugLogger` (the static one) was never wired to a service provider, so `DebugLogger.InfoAsync`/`WarningAsync`/etc. did nothing. It's active whenever the dashboard is, and stays a no-op otherwise.
+- A request whose handler threw was recorded with `StatusCode` 200. It's recorded as 500 now, unless the response already started with a different status.
 
 ## [2.3.0] - 2026-09-30
 

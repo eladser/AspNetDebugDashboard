@@ -57,7 +57,7 @@ Capture listens to the same diagnostic events the runtime uses for trace propaga
 
 ## ASP.NET Core 11
 
-On .NET 11, ASP.NET Core's own hosting activity (`Microsoft.AspNetCore.Hosting.HttpRequestIn`) carries the standard HTTP semantic-convention tags (`http.request.method`, `url.path`, `http.route`, `http.response.status_code`) by itself. The dashboard's request spans use the same names, so queries and filters in your backend work across both.
+On .NET 11, ASP.NET Core's own hosting activity carries OpenTelemetry semantic-convention tags (`http.request.method`, `url.path`, `http.response.status_code`, `server.address`) natively. Subscribe to the `Microsoft.AspNetCore` source and no instrumentation library is needed. The dashboard's request spans use overlapping names, so queries and filters in your backend work across both.
 
 If you trace ASP.NET Core and add the `AspNetDebugDashboard` source, you get two server spans per request: the framework's and the dashboard's. That's expected. The dashboard's span is useful for `debug.request_id` and `debug.sql_query_count`; if you don't need those, leave the source out or set `EmitActivities = false`.
 
