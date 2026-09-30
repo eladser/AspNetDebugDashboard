@@ -46,6 +46,12 @@ app.MapGet("/test", async context =>
     await context.Response.WriteAsync("Test endpoint");
 });
 
+app.MapGet("/test-throw", async context =>
+{
+    await Task.CompletedTask;
+    throw new InvalidOperationException("boom");
+});
+
 // Exercises outgoing HTTP capture: calls whatever url the test points it at with a plain
 // `new HttpClient()`, optionally attaching a body/header that should get redacted.
 app.MapGet("/test-outgoing", async context =>

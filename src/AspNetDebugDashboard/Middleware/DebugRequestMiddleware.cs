@@ -166,6 +166,13 @@ public class DebugRequestMiddleware
             requestBody = Redactor.RedactBody(requestBody, _config.RedactedBodyFields);
             responseBody = Redactor.RedactBody(responseBody, _config.RedactedBodyFields);
 
+            // next() threw before the response started, so StatusCode is still whatever
+            // ASP.NET Core defaults it to (200) rather than the 500 the client will actually
+            // get. If the response already started, whatever status was written stands.
+            var statusCode = exception != null && !context.Response.HasStarted
+                ? StatusCodes.Status500InternalServerError
+                : context.Response.StatusCode;
+
             var requestEntry = new RequestEntry
             {
                 Id = Guid.NewGuid().ToString(),
@@ -179,7 +186,7 @@ public class DebugRequestMiddleware
                 Headers = headers,
                 RequestBody = requestBody,
                 ResponseBody = responseBody,
-                StatusCode = context.Response.StatusCode,
+                StatusCode = statusCode,
                 ExecutionTimeMs = elapsedMs,
                 Timestamp = DateTime.UtcNow,
                 UserAgent = request.Headers.UserAgent.ToString(),

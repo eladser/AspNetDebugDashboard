@@ -198,6 +198,24 @@ public class StorageTests : IDisposable
         Assert.Equal(5, result.TotalCount);
     }
 
+    [Fact]
+    public async Task BulkDeleteAsync_WithDumpsType_DeletesDumps()
+    {
+        // Arrange
+        var id1 = await _storage.StoreDumpAsync(new DumpEntry { Label = "one" });
+        var id2 = await _storage.StoreDumpAsync(new DumpEntry { Label = "two" });
+        var keepId = await _storage.StoreDumpAsync(new DumpEntry { Label = "keep" });
+
+        // Act
+        var deleted = await _storage.BulkDeleteAsync(new[] { id1, id2 }, "dumps");
+
+        // Assert
+        Assert.Equal(2, deleted);
+        Assert.Null(await _storage.GetDumpAsync(id1));
+        Assert.Null(await _storage.GetDumpAsync(id2));
+        Assert.NotNull(await _storage.GetDumpAsync(keepId));
+    }
+
     public void Dispose()
     {
         _storage?.Dispose();

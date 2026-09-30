@@ -72,6 +72,9 @@ public static class ApplicationBuilderExtensions
         var dumpConfig = app.ApplicationServices.GetRequiredService<IOptions<DebugConfiguration>>().Value;
         DebugDump.Attach(storage, debugContext, dumpConfig);
 
+        // Same deal for the static DebugLogger: it stays a no-op until the dashboard is active.
+        DebugLogger.SetServiceProvider(app.ApplicationServices);
+
         // Rewrite a custom BasePath onto the canonical "/_debug" prefix the controllers'
         // route attributes match on, so any configured BasePath actually works.
         app.Use(async (context, next) =>

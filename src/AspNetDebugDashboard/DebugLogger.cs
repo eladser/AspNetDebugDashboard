@@ -77,7 +77,7 @@ public static class DebugLogger
     
     private static IServiceProvider? ServiceProvider { get; set; }
     
-    internal static void SetServiceProvider(IServiceProvider serviceProvider)
+    internal static void SetServiceProvider(IServiceProvider? serviceProvider)
     {
         ServiceProvider = serviceProvider;
     }

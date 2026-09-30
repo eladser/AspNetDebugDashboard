@@ -725,6 +725,7 @@ public class LiteDbStorage : IDebugStorage
                     "logs" => _logs.Delete(id),
                     "exceptions" => _exceptions.Delete(id),
                     "http" => _outgoingHttp.Delete(id),
+                    "dumps" => _dumps.Delete(id),
                     _ => false
                 };
                 if (success) deleted++;

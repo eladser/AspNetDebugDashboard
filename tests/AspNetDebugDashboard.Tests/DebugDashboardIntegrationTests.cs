@@ -276,6 +276,48 @@ public class DebugDashboardIntegrationTests : IClassFixture<TestWebApplicationFa
     }
 
     [Fact]
+    public async Task ThrowingEndpoint_IsRecordedWithStatus500()
+    {
+        // Arrange: LogResponseBodies off here so the developer exception page (added
+        // ahead of the dashboard middleware by the Development environment) can still
+        // write its response, instead of running into the buffered body stream.
+        var factory = _factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureServices(services =>
+            {
+                services.Configure<HealthCheckServiceOptions>(options =>
+                {
+                    options.Registrations.Clear();
+                });
+
+                services.AddDebugDashboard(options =>
+                {
+                    options.IsEnabled = true;
+                    options.LogResponseBodies = false;
+                    options.DatabasePath = $":memory:{Guid.NewGuid()}";
+                });
+            });
+        });
+        var client = factory.CreateClient();
+
+        // Act
+        var response = await client.GetAsync("/test-throw");
+        response.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
+
+        await Task.Delay(100);
+
+        var requestsResponse = await client.GetAsync("/_debug/api/requests?path=/test-throw");
+        requestsResponse.EnsureSuccessStatusCode();
+
+        var content = await requestsResponse.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<JsonElement>(content);
+        var items = result.GetProperty("items");
+
+        items.GetArrayLength().Should().BeGreaterThan(0);
+        items[0].GetProperty("statusCode").GetInt32().Should().Be(500);
+    }
+
+    [Fact]
     public async Task Dashboard_DisabledInProduction_ReturnsNotFound()
     {
         // Arrange
