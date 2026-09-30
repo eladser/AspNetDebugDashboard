@@ -4,7 +4,7 @@
 [![Downloads](https://img.shields.io/nuget/dt/AspNetDebugDashboard.Mcp.svg)](https://www.nuget.org/packages/AspNetDebugDashboard.Mcp/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/eladser/AspNetDebugDashboard/blob/main/LICENSE)
 
-An MCP server that lets a coding agent (Claude, Copilot, etc.) read the data [AspNetDebugDashboard](https://github.com/eladser/AspNetDebugDashboard) captures from your running app: recent requests, the SQL a request ran, recent failures, slow queries, performance numbers.
+An MCP server that lets a coding agent (Claude, Copilot, etc.) read the data [AspNetDebugDashboard](https://github.com/eladser/AspNetDebugDashboard) captures from your running app: recent requests, the SQL a request ran, outgoing HTTP calls, dumps, recent failures, slow queries, performance numbers.
 
 It's a thin client over the dashboard's REST API, so your app needs to be running with the dashboard enabled.
 
@@ -39,6 +39,8 @@ Point your MCP client at the `aspnet-debug-mcp` command. For Claude Desktop / Cl
 - `recent_queries`: newest SQL, optionally slow-only
 - `recent_exceptions`: newest unhandled exceptions with stack traces
 - `recent_logs`: newest logs, optionally by level
+- `recent_outgoing_http`: newest outgoing `HttpClient` calls, optionally failed-only or limited to one request
+- `recent_dumps`: newest `DebugDump.Dump()` snapshots with their JSON, optionally limited to one request
 - `performance`: last-hour metrics (P95/P99, error rate, slowest endpoints)
 - `search`: across all captured data
 

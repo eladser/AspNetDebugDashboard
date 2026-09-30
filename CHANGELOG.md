@@ -2,13 +2,35 @@
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [2.4.0] - 2026-11-10
+
+Existing setup is unchanged unless you implement `IDebugStorage` yourself (see Changed). Outgoing HTTP capture and live updates are on by default (still only in allowed environments). Outgoing request and response bodies stay off until you opt in.
 
 ### Added
+- `net11.0` target, alongside `net8.0`, `net9.0`, and `net10.0`. EF Core 11 on that target. `AspNetDebugDashboard.Mcp` also targets `net11.0`.
+- Outgoing HTTP capture. Calls made through any `HttpClient` (`new HttpClient()`, `IHttpClientFactory`, SDK clients built on it) are recorded through the runtime's `HttpHandlerDiagnosticListener`, with method, URL, status, timing, headers, and the inbound request they belong to. `ExcludedHeaders` applies to them, URL userinfo is stripped, and query parameters matching `RedactedBodyFields` are stored as `***`. Bodies are opt-in (`CaptureOutgoingHttpBodies`) and capped at `MaxOutgoingBodySize`. Retries show up as one entry per attempt. New Outgoing tab, an HTTP tab in request detail, `GET /api/http-requests` (and `/{id}`), and MCP `recent_outgoing_http`.
+- `DebugDump.Dump(value, label)`: snapshots any object as a JSON tree at the call site, with file, line, and member. Cycles are marked, getter exceptions are stored as strings, and redacted field names are masked. Limited by `DumpMaxDepth`, `DumpMaxItems`, and `DumpMaxSize` (truncated dumps are flagged). Dumps taken during a request are attached to it, up to `MaxDumpsPerRequest`. A no-op unless the dashboard is active. New Dumps tab, a Dumps tab in request detail, `GET /api/dumps` (and `/{id}`), and MCP `recent_dumps`.
+- Live updates over server-sent events at `GET /api/stream`. The dashboard refreshes when an entry is stored instead of polling every few seconds, and falls back to polling if the stream can't open or goes quiet.
+- Options, with defaults: `CaptureOutgoingHttp` (true), `CaptureOutgoingHttpBodies` (false), `MaxOutgoingBodySize` (64 KB), `CaptureUnattachedOutgoingHttp` (false), `DumpMaxDepth` (6), `DumpMaxItems` (100), `DumpMaxSize` (64 KB), `MaxDumpsPerRequest` (50).
+- Stats, search, export, and clear include dumps and outgoing calls.
 
 ### Changed
+- `AspNetDebugDashboard.Mcp` runs on ModelContextProtocol 2.x (2.2.0). Microsoft.Extensions.Hosting and Microsoft.Extensions.Http bumped to 10.0.12 to match. Every tool now advertises an input schema, including parameterless ones.
+- `EnableRealTimeUpdates` is no longer obsolete. It turns the event stream on or off (default on); with it off, `/api/stream` returns 404 and the UI polls.
+- `IDebugStorage` has new members for outgoing calls, dumps, and compaction (`StoreOutgoingHttpAsync`, `StoreDumpAsync`, `CompactAsync`, `DeleteOldestFractionAsync`, and the matching getters). Custom storage implementations need to add them; the full list is in [docs/API.md](docs/API.md#idebugstorage-interface).
+- `StorageCleanupService` is marked obsolete and no longer registered. `DebugDashboardCleanupService` is the only cleanup service.
 
 ### Fixed
+- `RetentionPeriod` and `CleanupInterval` were ignored (cleanup always used 7 days and 1 hour). Both are honored now.
+- `MaxDatabaseSize` was never enforced. When the database goes over it, cleanup deletes the oldest 25% of each collection and compacts the file, up to four passes, and logs a warning if it's still over. The health check uses the same limit instead of a hardcoded 100 MB.
+- The database file is compacted after size cleanup, so deleted entries give disk space back.
+- Database size now includes the `-log.db` file, and the log is checkpointed before measuring.
+- The cleanup service no longer resolves storage outside `AllowedEnvironments`, which created the database file in Production.
+- Cleanup errors are logged instead of swallowed, and a failed cycle doesn't stop the next one.
+- `EnableRealTimeUpdates` set in `AddDebugDashboard` or appsettings was dropped by the options copy.
+- Per-request capture lists are thread-safe, so parallel work inside one request (outgoing calls, dumps, logs, queries) no longer races.
+- Capturing outgoing response bodies keeps the original `Content-Length`.
+- Dumps never block on `Task.Result` and never enumerate an `IQueryable`, so dumping a pending task or an EF query doesn't hang or run SQL.
 
 ## [2.3.0] - 2026-09-30
 
