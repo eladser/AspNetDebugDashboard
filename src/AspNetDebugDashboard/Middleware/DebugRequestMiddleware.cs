@@ -205,6 +205,7 @@ public class DebugRequestMiddleware
                 requestEntry.SqlQueries = tracked.SqlQueries;
                 requestEntry.Logs = tracked.Logs;
                 requestEntry.Dumps = tracked.Dumps;
+                requestEntry.OutgoingHttp = tracked.OutgoingHttp;
             }
 
             await _storage.StoreRequestAsync(requestEntry);

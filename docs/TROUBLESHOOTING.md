@@ -117,6 +117,10 @@ config.ExcludedPaths = new() { "/_debug", "/health", "/metrics", "/api/file-uplo
 
 Matching is contains-based on the path.
 
+## DebugLogger or DebugDump entries land in the wrong app (integration tests)
+
+`DebugLogger` and `DebugDump` are static, so they belong to whichever host called `UseDebugDashboard()` last. With several `WebApplicationFactory` hosts running in parallel in one test process, entries can end up in another host's store or get dropped. They never throw into your code. Run those test classes sequentially (an xUnit collection, or `DisableTestParallelization`) if you assert on them. The injected `IDebugLogger` doesn't have this problem.
+
 ## Version requirements
 
 - .NET 8, 9, 10, or 11

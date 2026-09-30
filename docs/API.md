@@ -514,8 +514,7 @@ Returns current configuration.
   "logRequestBodies": true,
   "logResponseBodies": false,
   "logSqlQueries": true,
-  "logExceptions": true,
-  "enableRealTimeUpdates": true
+  "logExceptions": true
 }
 ```
 

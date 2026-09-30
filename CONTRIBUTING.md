@@ -8,7 +8,7 @@ Include the .NET version, the package version, and a minimal repro if you can. "
 
 ## Building
 
-You need the .NET 10 SDK and Node 20+.
+You need the .NET 10 SDK, the .NET 11 SDK (preview until November 2026) for the net11.0 target, and Node 20+.
 
 ```bash
 # library + tests
@@ -44,6 +44,6 @@ src/AspNetDebugDashboard/   the package: middleware, interceptor, storage, API c
 src/AspNetDebugDashboard.Mcp/  MCP server (dotnet tool) over the REST API
 dashboard/                  dashboard UI source (Vite + React + TS)
 samples/SampleApp/          test bed with traffic-generating endpoints
-tests/                      xUnit suite, runs on net8.0 and net10.0
+tests/                      xUnit suite, runs on net8.0, net10.0 and net11.0
 docs/                       configuration and API reference
 ```

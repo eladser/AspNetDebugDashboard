@@ -119,6 +119,10 @@ public class OutgoingHttpCaptureTests : IAsyncLifetime
 
         var requests = await Storage.GetRequestsAsync(new DebugFilter { RequestId = call.RequestId, PageSize = 10 });
         requests.Items.Should().ContainSingle(r => r.Path == "/test-outgoing");
+
+        // the stored request carries the call too, which is what the detail view's HTTP tab reads
+        var parent = await Storage.GetRequestAsync(requests.Items.Single().Id);
+        parent!.OutgoingHttp.Should().ContainSingle(o => o.Method == "GET" && o.StatusCode == 200);
     }
 
     [Fact]

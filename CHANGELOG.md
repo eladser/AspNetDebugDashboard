@@ -15,6 +15,7 @@ Existing setup is unchanged unless you implement `IDebugStorage` yourself (see C
 - Stats, search, export, clear, and bulk delete include dumps and outgoing calls.
 
 ### Changed
+- Two things are on by default after upgrading: outgoing HTTP capture (`CaptureOutgoingHttp`) and live updates (`EnableRealTimeUpdates`). Set either to false to keep 2.3 behavior. Outgoing bodies stay off unless `CaptureOutgoingHttpBodies` is set.
 - `AspNetDebugDashboard.Mcp` runs on ModelContextProtocol 2.x (2.2.0). Microsoft.Extensions.Hosting and Microsoft.Extensions.Http bumped to 10.0.12 to match. Every tool now advertises an input schema, including parameterless ones.
 - `EnableRealTimeUpdates` is no longer obsolete. It turns the event stream on or off (default on); with it off, `/api/stream` returns 404 and the UI polls.
 - `IDebugStorage` has new members for outgoing calls, dumps, and compaction (`StoreOutgoingHttpAsync`, `StoreDumpAsync`, `CompactAsync`, `DeleteOldestFractionAsync`, and the matching getters). Custom storage implementations need to add them; the full list is in [docs/API.md](docs/API.md#idebugstorage-interface).

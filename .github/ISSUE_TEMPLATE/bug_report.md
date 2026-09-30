@@ -25,7 +25,7 @@ If applicable, add screenshots to help explain your problem.
 
 **Environment (please complete the following information):**
  - OS: [e.g. Windows 11, Ubuntu 24.04]
- - .NET Version: [e.g. 8.0, 9.0, 10.0]
+ - .NET Version: [e.g. 8.0, 9.0, 10.0, 11.0]
  - AspNetDebugDashboard Version: [e.g. 2.0.0]
  - Browser: [e.g. Chrome, Firefox]
 
