@@ -39,6 +39,9 @@ public class DebugFilter
     // SQL filtering
     public bool? IsSuccessful { get; set; }
     public bool? IsSlowQuery { get; set; }
+
+    // Outgoing HTTP filtering
+    public string? Host { get; set; }
     
     // Validation
     public bool IsValid()
@@ -116,6 +119,7 @@ public class ExportData
     public List<SqlQueryEntry> Queries { get; set; } = new();
     public List<LogEntry> Logs { get; set; } = new();
     public List<ExceptionEntry> Exceptions { get; set; } = new();
+    public List<OutgoingHttpEntry> OutgoingHttp { get; set; } = new();
     public Dictionary<string, object> Metadata { get; set; } = new();
 }
 
