@@ -18,7 +18,7 @@
     <PackageTags>aspnetcore;debugging;dashboard;telescope;logging;monitoring;efcore;middleware;developer-tools</PackageTags>
     <RepositoryUrl>https://github.com/eladser/AspNetDebugDashboard</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageReleaseNotes>2.1.1 fixes the README images not rendering on the NuGet listing (now absolute URLs). 2.1.0 added OpenTelemetry tracing on the "AspNetDebugDashboard" ActivitySource and a companion MCP server (AspNetDebugDashboard.Mcp) for coding agents.</PackageReleaseNotes>
+    <PackageReleaseNotes>In 2.3.0 the UI, API, and EF interceptor check a new AllowedEnvironments option (default: Development only) and return 404 outside it, and an optional AuthorizationFilter can reject any dashboard request with a 401. More auth headers (Set-Cookie, X-Api-Key, X-Auth-Token, Proxy-Authorization) are excluded by default, and password, secret, token, and apikey fields in captured JSON and form bodies are stored as ***. EmitActivities = false and custom BasePath values now work, and the unused SignalR hub is gone, so EnableRealTimeUpdates and AddDebugDashboardSignalR() are obsolete and do nothing. Older versions are in the changelog: https://github.com/eladser/AspNetDebugDashboard/blob/main/CHANGELOG.md</PackageReleaseNotes>
     <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest</AnalysisLevel>
