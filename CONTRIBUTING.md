@@ -8,7 +8,7 @@ Include the .NET version, the package version, and a minimal repro if you can. "
 
 ## Building
 
-You need the .NET 10 SDK, the .NET 11 SDK (preview until November 2026) for the net11.0 target, and Node 20+.
+You need the .NET 10 and 11 SDKs and Node 20+.
 
 ```bash
 # library + tests
