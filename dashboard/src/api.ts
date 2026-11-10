@@ -1,8 +1,10 @@
 import type {
   DebugStats,
+  DumpEntry,
   ExceptionEntry,
   ListQuery,
   LogEntry,
+  OutgoingHttpEntry,
   PagedResult,
   PerfMetrics,
   RequestEntry,
@@ -41,6 +43,7 @@ function listUrl(resource: string, q: ListQuery): string {
   if (q.isSlowQuery !== undefined) p.set('isSlowQuery', String(q.isSlowQuery));
   if (q.minExecutionTime !== undefined) p.set('minExecutionTime', String(q.minExecutionTime));
   if (q.requestId) p.set('requestId', q.requestId);
+  if (q.host) p.set('host', q.host);
   return `${apiBase}/${resource}?${p}`;
 }
 
@@ -63,6 +66,14 @@ export const api = {
     getJson<PagedResult<ExceptionEntry>>(listUrl('exceptions', q), signal),
   exception: (id: string) => getJson<ExceptionEntry>(`${apiBase}/exceptions/${id}`),
 
+  dumps: (q: ListQuery, signal?: AbortSignal) =>
+    getJson<PagedResult<DumpEntry>>(listUrl('dumps', q), signal),
+  dump: (id: string) => getJson<DumpEntry>(`${apiBase}/dumps/${id}`),
+
+  outgoingHttp: (q: ListQuery, signal?: AbortSignal) =>
+    getJson<PagedResult<OutgoingHttpEntry>>(listUrl('http-requests', q), signal),
+  outgoingHttpCall: (id: string) => getJson<OutgoingHttpEntry>(`${apiBase}/http-requests/${id}`),
+
   performance: (signal?: AbortSignal) => getJson<PerfMetrics>(`${apiBase}/performance`, signal),
 
   search: (term: string, signal?: AbortSignal) =>
@@ -70,4 +81,5 @@ export const api = {
 
   clearAll: () => fetch(`${apiBase}/clear`, { method: 'DELETE' }),
   exportUrl: `${apiBase}/export`,
+  streamUrl: `${apiBase}/stream`,
 };

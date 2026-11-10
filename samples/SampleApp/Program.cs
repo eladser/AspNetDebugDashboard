@@ -32,6 +32,7 @@ builder.Services.AddDebugDashboard(config =>
     config.LogSqlQueries = true;
     config.LogExceptions = true;
     config.MaxEntries = 1000;
+    config.CaptureOutgoingHttpBodies = true;
 });
 
 // SQLite so the EF interceptor has real SQL to capture
@@ -62,6 +63,9 @@ builder.Services.AddHealthChecks()
 // Add sample services
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
+
+// Plain HttpClient so calls made from ExternalApiController show up under Outgoing/HTTP
+builder.Services.AddHttpClient();
 
 var app = builder.Build();
 

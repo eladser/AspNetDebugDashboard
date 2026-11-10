@@ -1,6 +1,7 @@
 using AspNetDebugDashboard.Core.Models;
 using AspNetDebugDashboard.Core.Services;
 using AspNetDebugDashboard.Storage;
+using AspNetDebugDashboard.Capture;
 using AspNetDebugDashboard.Interceptors;
 using AspNetDebugDashboard.Services;
 using AspNetDebugDashboard.Suite;
@@ -53,6 +54,15 @@ public static class ServiceCollectionExtensions
             options.CleanupInterval = config.CleanupInterval;
             options.MaxDatabaseSize = config.MaxDatabaseSize;
             options.EmitActivities = config.EmitActivities;
+            options.EnableRealTimeUpdates = config.EnableRealTimeUpdates;
+            options.CaptureOutgoingHttp = config.CaptureOutgoingHttp;
+            options.CaptureOutgoingHttpBodies = config.CaptureOutgoingHttpBodies;
+            options.MaxOutgoingBodySize = config.MaxOutgoingBodySize;
+            options.CaptureUnattachedOutgoingHttp = config.CaptureUnattachedOutgoingHttp;
+            options.DumpMaxDepth = config.DumpMaxDepth;
+            options.DumpMaxItems = config.DumpMaxItems;
+            options.DumpMaxSize = config.DumpMaxSize;
+            options.MaxDumpsPerRequest = config.MaxDumpsPerRequest;
         });
         
         // Advertise the dashboard to the shared suite sidebar (first slot)
@@ -61,6 +71,7 @@ public static class ServiceCollectionExtensions
         // Register core services
         services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
         services.AddSingleton<DebugContext>();
+        services.AddSingleton<DebugEventBus>();
         services.AddScoped<IDebugLogger, Core.Services.DebugLogger>();
         services.AddScoped<IDebugDashboardService, DebugDashboardService>();
         
@@ -75,7 +86,12 @@ public static class ServiceCollectionExtensions
         {
             services.AddHostedService<DebugDashboardCleanupService>();
         }
-        
+
+        if (config.IsEnabled && config.CaptureOutgoingHttp)
+        {
+            services.AddHostedService<OutgoingHttpObserver>();
+        }
+
         // Register health checks
         services.AddHealthChecks()
             .AddCheck<DebugDashboardHealthCheck>("debug-dashboard", 

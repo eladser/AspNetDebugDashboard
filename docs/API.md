@@ -27,6 +27,8 @@ Returns overall statistics about the debug data.
   "totalSqlQueries": 45,
   "totalExceptions": 2,
   "totalLogs": 89,
+  "totalDumps": 4,
+  "totalOutgoingHttp": 12,
   "averageResponseTime": 245.6,
   "averageSqlTime": 12.3,
   "statusCodeDistribution": {
@@ -110,6 +112,8 @@ Returns a paginated list of HTTP requests.
       "timestamp": "2025-01-07T10:30:00Z",
       "sqlQueries": [],
       "logs": [],
+      "outgoingHttp": [],
+      "dumps": [],
       "exception": null
     }
   ],
@@ -341,6 +345,139 @@ Returns a paginated list of exceptions.
 
 Returns a specific exception by ID.
 
+## Outgoing HTTP API
+
+### GET `/_debug/api/http-requests`
+
+Returns a paginated list of outgoing HTTP calls, newest first by default.
+
+**Query Parameters:**
+- `page` (int): Page number (default: 1)
+- `pageSize` (int): Items per page (default: 50)
+- `search` (string): Match against URL and host (contains)
+- `host` (string): Filter by host (contains)
+- `isSuccessful` (bool): `false` returns calls that failed (no response, or 4xx/5xx), `true` the rest
+- `requestId` (string): Only calls made while handling this inbound request
+- `sortBy` (string): Sort field (default: `timestamp`)
+- `sortDescending` (bool): Sort direction (default: true)
+
+**Response:**
+```json
+{
+  "items": [
+    {
+      "id": "0b7c1e7a-3f0e-4d8e-9b44-5e1f2a6c9d10",
+      "method": "GET",
+      "url": "https://api.github.com/zen",
+      "host": "api.github.com",
+      "statusCode": 200,
+      "executionTimeMs": 78,
+      "requestHeaders": { "User-Agent": "AspNetDebugDashboard-SampleApp" },
+      "responseHeaders": { "Content-Type": "text/plain;charset=utf-8" },
+      "requestBody": null,
+      "responseBody": "Practicality beats purity.",
+      "error": null,
+      "exceptionType": null,
+      "traceId": "c94c706d5472fd0a",
+      "requestId": "0HNOUKQ37MI6B:00000003",
+      "timestamp": "2026-09-30T06:58:22Z"
+    }
+  ],
+  "totalCount": 12,
+  "page": 1,
+  "pageSize": 50,
+  "totalPages": 1,
+  "hasNextPage": false,
+  "hasPreviousPage": false
+}
+```
+
+`statusCode` is null when no response came back; `error` then says why (`Request canceled or timed out`, or the exception message with `exceptionType`). Bodies are null unless `CaptureOutgoingHttpBodies` is on. The response body is filled in once the caller has read the response, so a call that is still being read may show it a moment later.
+
+### GET `/_debug/api/http-requests/{id}`
+
+Returns one outgoing call by ID.
+
+## Dumps API
+
+### GET `/_debug/api/dumps`
+
+Returns a paginated list of `DebugDump.Dump()` snapshots.
+
+**Query Parameters:**
+- `page` (int): Page number (default: 1)
+- `pageSize` (int): Items per page (default: 50)
+- `search` (string): Match against label, type name, and the dumped JSON (contains)
+- `requestId` (string): Only dumps taken during this request
+- `sortBy` (string): Sort field (default: `timestamp`)
+- `sortDescending` (bool): Sort direction (default: true)
+
+**Response:**
+```json
+{
+  "items": [
+    {
+      "id": "515ba32e-a518-459d-91bb-ae623a22727f",
+      "label": "created order",
+      "typeName": "SampleApp.Models.Order",
+      "json": "{\"Id\":3,\"CustomerId\":1,\"TotalAmount\":1059.97,\"Status\":\"Pending\",\"OrderItems\":[...]}",
+      "truncated": false,
+      "file": "/src/samples/SampleApp/Controllers/OrdersController.cs",
+      "line": 59,
+      "member": "Create",
+      "requestId": "0HNOUKQ37MI6B:00000001",
+      "timestamp": "2026-09-30T06:54:28Z"
+    }
+  ],
+  "totalCount": 1,
+  "page": 1,
+  "pageSize": 50,
+  "totalPages": 1,
+  "hasNextPage": false,
+  "hasPreviousPage": false
+}
+```
+
+`json` is the snapshot as a JSON string. `truncated` is true when it hit `DumpMaxDepth`, `DumpMaxItems`, or `DumpMaxSize`.
+
+### GET `/_debug/api/dumps/{id}`
+
+Returns one dump by ID.
+
+## Live Updates
+
+### GET `/_debug/api/stream`
+
+A server-sent events stream (`text/event-stream`) that fires whenever an entry is stored. The dashboard uses it to know when to refetch; it carries the entry type, not the entry itself.
+
+```text
+retry: 5000
+
+event: entry
+data: {"type":"requests"}
+
+event: entry
+data: {"type":"outgoingHttp"}
+
+event: ping
+data: {}
+```
+
+- `retry: 5000` is sent once on connect, so `EventSource` reconnects after 5 seconds if the connection drops.
+- `entry` events carry one of `requests`, `sqlQueries`, `logs`, `exceptions`, `outgoingHttp`, `dumps`.
+- `ping` is sent after 15 seconds without an entry, to keep proxies from closing an idle connection.
+- Each subscriber has a buffer of 100 events; a client that falls behind loses the oldest ones. Treat events as "something changed", not as a log.
+- The stream closes when the app shuts down. It returns 404 when `EnableRealTimeUpdates` is false, and the same access checks as the rest of the API apply.
+
+From a browser:
+
+```js
+const es = new EventSource('/_debug/api/stream');
+es.addEventListener('entry', (e) => console.log(JSON.parse(e.data).type));
+```
+
+Or from a terminal: `curl -N http://localhost:5000/_debug/api/stream`.
+
 ## Management API
 
 ### DELETE `/_debug/api/clear`
@@ -377,8 +514,7 @@ Returns current configuration.
   "logRequestBodies": true,
   "logResponseBodies": false,
   "logSqlQueries": true,
-  "logExceptions": true,
-  "enableRealTimeUpdates": true
+  "logExceptions": true
 }
 ```
 
@@ -407,11 +543,11 @@ Metrics computed over the last 60 minutes of requests.
 
 ### GET `/_debug/api/search?term={text}&types={types}`
 
-Searches across entry types. `types` is optional (`requests`, `queries`, `logs`, `exceptions`); without it all types are searched. Returns up to 50 hits as `{ "type": "...", "data": { ... } }` pairs.
+Searches across entry types. `types` is optional (`requests`, `queries`, `logs`, `exceptions`, `dumps`, `http`); without it all types are searched. Returns up to 50 hits as `{ "type": "...", "data": { ... } }` pairs.
 
 ### GET `/_debug/api/export`
 
-Downloads everything (stats, requests, queries, logs, exceptions) as a single JSON file.
+Downloads everything (stats, requests, queries, logs, exceptions, dumps, outgoing HTTP calls) as a single JSON file.
 
 ### GET `/_debug/api/health`
 
@@ -482,8 +618,39 @@ public interface IDebugStorage : IDisposable
     Task OptimizeAsync();
     Task<long> GetDatabaseSizeAsync();
     Task<int> GetTotalEntriesAsync();
+    Task CompactAsync();
+    Task DeleteOldestFractionAsync(double fraction);
+
+    // Outgoing HTTP capture
+    Task<string> StoreOutgoingHttpAsync(OutgoingHttpEntry entry);
+    Task<PagedResult<OutgoingHttpEntry>> GetOutgoingHttpAsync(DebugFilter filter);
+    Task<OutgoingHttpEntry?> GetOutgoingHttpEntryAsync(string id);
+    Task<int> GetOutgoingHttpCountAsync();
+    Task<bool> DeleteOutgoingHttpAsync(string id);
+    Task<bool> UpdateOutgoingHttpResponseBodyAsync(string id, string responseBody);
+
+    // Dumps
+    Task<string> StoreDumpAsync(DumpEntry entry);
+    Task<PagedResult<DumpEntry>> GetDumpsAsync(DebugFilter filter);
+    Task<DumpEntry?> GetDumpAsync(string id);
+    Task<int> GetDumpCountAsync();
+    Task<bool> DeleteDumpAsync(string id);
 }
 ```
+
+### DebugDump Class
+
+```csharp
+public static class DebugDump
+{
+    public static void Dump(object? value, string? label = null,
+        [CallerFilePath] string file = "",
+        [CallerLineNumber] int line = 0,
+        [CallerMemberName] string member = "");
+}
+```
+
+Pass `value` and optionally `label`; the compiler fills in the rest. The snapshot is taken synchronously, storage happens in the background. Nothing is captured until `UseDebugDashboard()` has run in an allowed environment.
 
 ### Configuration
 

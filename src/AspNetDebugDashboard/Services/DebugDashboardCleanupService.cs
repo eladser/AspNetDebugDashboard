@@ -1,5 +1,6 @@
 using AspNetDebugDashboard.Core.Models;
 using AspNetDebugDashboard.Core.Services;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -10,39 +11,47 @@ namespace AspNetDebugDashboard.Services;
 
 public class DebugDashboardCleanupService : BackgroundService
 {
+    private const int MaxCompactionPasses = 4;
+    private const double DeleteFractionOnOverflow = 0.25;
+
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<DebugDashboardCleanupService> _logger;
     private readonly DebugConfiguration _config;
+    private readonly IWebHostEnvironment? _env;
 
     public DebugDashboardCleanupService(
         IServiceProvider serviceProvider,
         ILogger<DebugDashboardCleanupService> logger,
-        IOptions<DebugConfiguration> config)
+        IOptions<DebugConfiguration> config,
+        IWebHostEnvironment? env = null)
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
         _config = config.Value;
+        _env = env;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (!_config.IsEnabled)
+        // Never resolve storage outside the allowed environments - that's what created
+        // the db file in Production before (LiteDbStorage is a lazy singleton).
+        if (_env == null || !DebugDashboardAccess.IsActive(_config, _env))
         {
-            _logger.LogInformation("Debug Dashboard cleanup service disabled");
+            _logger.LogInformation("Debug Dashboard cleanup service is not active for this environment");
             return;
         }
 
         _logger.LogInformation("Debug Dashboard cleanup service started");
 
+        var interval = _config.CleanupInterval ?? TimeSpan.FromHours(1);
+
         while (!stoppingToken.IsCancellationRequested)
         {
+            // net11's IHost.RunAsync throws on a failed BackgroundService, so nothing here
+            // is allowed to escape this loop.
             try
             {
-                await PerformCleanupAsync();
-                
-                // Wait for the next cleanup cycle (default: 1 hour)
-                var delay = TimeSpan.FromHours(1);
-                await Task.Delay(delay, stoppingToken);
+                await PerformCleanupAsync(stoppingToken);
             }
             catch (OperationCanceledException)
             {
@@ -51,79 +60,60 @@ public class DebugDashboardCleanupService : BackgroundService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error during cleanup cycle");
-                await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken); // Wait 5 minutes before retry
+            }
+
+            try
+            {
+                await Task.Delay(interval, stoppingToken);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
             }
         }
 
         _logger.LogInformation("Debug Dashboard cleanup service stopped");
     }
 
-    private async Task PerformCleanupAsync()
+    private async Task PerformCleanupAsync(CancellationToken stoppingToken)
     {
         using var scope = _serviceProvider.CreateScope();
         var storage = scope.ServiceProvider.GetRequiredService<IDebugStorage>();
 
-        try
+        var cutoff = DateTime.UtcNow.Subtract(_config.RetentionPeriod);
+        var deletedByAge = await storage.DeleteOlderThanAsync(cutoff);
+        if (deletedByAge > 0)
         {
-            _logger.LogDebug("Starting cleanup cycle");
-
-            // Get current counts
-            var totalEntries = await storage.GetTotalEntriesAsync();
-            var databaseSize = await storage.GetDatabaseSizeAsync();
-
-            _logger.LogDebug("Current state: {TotalEntries} entries, {DatabaseSize} bytes", 
-                totalEntries, databaseSize);
-
-            var cleanedItems = 0;
-
-            // 1. Clean by retention period (default: 7 days)
-            var cutoff = DateTime.UtcNow.Subtract(TimeSpan.FromDays(7));
-            var deletedByAge = await storage.DeleteOlderThanAsync(cutoff);
-            cleanedItems += deletedByAge;
-            
-            if (deletedByAge > 0)
-            {
-                _logger.LogInformation("Deleted {Count} entries older than {Cutoff}", 
-                    deletedByAge, cutoff);
-            }
-
-            // 2. Clean by max entries limit
-            if (_config.MaxEntries > 0)
-            {
-                await storage.CleanupAsync(_config.MaxEntries);
-                _logger.LogDebug("Applied max entries limit: {MaxEntries}", _config.MaxEntries);
-            }
-
-            // 3. Optimize database
-            await storage.OptimizeAsync();
-
-            // 4. Log results
-            var newTotalEntries = await storage.GetTotalEntriesAsync();
-            var newDatabaseSize = await storage.GetDatabaseSizeAsync();
-
-            _logger.LogInformation(
-                "Cleanup completed: {CleanedItems} items removed, {BeforeEntries} -> {AfterEntries} entries, {BeforeSize} -> {AfterSize} bytes",
-                cleanedItems, totalEntries, newTotalEntries, databaseSize, newDatabaseSize);
-
-            // 5. Check if we need to alert about storage issues
-            if (newDatabaseSize > 100 * 1024 * 1024) // 100MB default limit
-            {
-                _logger.LogWarning(
-                    "Database size ({CurrentSize} bytes) is getting large",
-                    newDatabaseSize);
-            }
+            _logger.LogInformation("Deleted {Count} entries older than {Cutoff}", deletedByAge, cutoff);
         }
-        catch (Exception ex)
+
+        if (_config.MaxEntries > 0)
         {
-            _logger.LogError(ex, "Error during cleanup operation");
-            throw;
+            await storage.CleanupAsync(_config.MaxEntries);
         }
-    }
 
-    public override async Task StopAsync(CancellationToken cancellationToken)
-    {
-        _logger.LogInformation("Debug Dashboard cleanup service stopping...");
-        await base.StopAsync(cancellationToken);
+        // Checkpoint to flush the WAL before measuring size - otherwise GetDatabaseSizeAsync
+        // undercounts everything still sitting in the -log.db file.
+        await storage.OptimizeAsync();
+        var size = await storage.GetDatabaseSizeAsync();
+
+        var passes = 0;
+        while (size > _config.MaxDatabaseSize && passes < MaxCompactionPasses)
+        {
+            stoppingToken.ThrowIfCancellationRequested();
+
+            await storage.DeleteOldestFractionAsync(DeleteFractionOnOverflow);
+            await storage.CompactAsync();
+            size = await storage.GetDatabaseSizeAsync();
+            passes++;
+        }
+
+        if (size > _config.MaxDatabaseSize)
+        {
+            _logger.LogWarning(
+                "Database size ({Size} bytes) still exceeds MaxDatabaseSize ({Max} bytes) after {Passes} compaction passes",
+                size, _config.MaxDatabaseSize, passes);
+        }
     }
 }
 
@@ -155,12 +145,12 @@ public class DebugDashboardHealthCheck : IHealthCheck
             }
 
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-            
+
             // Test storage connectivity
             var stats = await _storage.GetStatsAsync();
             var totalEntries = await _storage.GetTotalEntriesAsync();
             var databaseSize = await _storage.GetDatabaseSizeAsync();
-            
+
             stopwatch.Stop();
 
             var data = new Dictionary<string, object>
@@ -173,17 +163,17 @@ public class DebugDashboardHealthCheck : IHealthCheck
 
             // Check for warning conditions
             var warnings = new List<string>();
-            
+
             if (totalEntries > _config.MaxEntries * 0.9)
             {
                 warnings.Add($"Entry count ({totalEntries}) approaching limit ({_config.MaxEntries})");
             }
-            
-            if (databaseSize > 100 * 1024 * 1024 * 0.9) // 90% of 100MB
+
+            if (databaseSize > _config.MaxDatabaseSize * 0.9)
             {
-                warnings.Add($"Database size approaching limit");
+                warnings.Add("Database size approaching limit");
             }
-            
+
             if (stopwatch.ElapsedMilliseconds > 1000)
             {
                 warnings.Add("Storage response time is slow");
@@ -200,10 +190,10 @@ public class DebugDashboardHealthCheck : IHealthCheck
         catch (Exception ex)
         {
             _logger.LogError(ex, "Health check failed");
-            
+
             return Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Unhealthy(
-                "Debug Dashboard health check failed", 
-                ex, 
+                "Debug Dashboard health check failed",
+                ex,
                 new Dictionary<string, object>
                 {
                     ["error"] = ex.Message,

@@ -244,12 +244,22 @@ public class DebugApiControllerTests
         {
             Items = new List<ExceptionEntry>() // Use empty list to avoid circular reference
         };
+        var mockDumps = new PagedResult<DumpEntry>
+        {
+            Items = _fixture.CreateMany<DumpEntry>(2).ToList()
+        };
+        var mockHttpCalls = new PagedResult<OutgoingHttpEntry>
+        {
+            Items = _fixture.CreateMany<OutgoingHttpEntry>(2).ToList()
+        };
 
         _mockStorage.Setup(x => x.GetStatsAsync()).ReturnsAsync(mockStats);
         _mockStorage.Setup(x => x.GetRequestsAsync(It.IsAny<DebugFilter>())).ReturnsAsync(mockRequests);
         _mockStorage.Setup(x => x.GetSqlQueriesAsync(It.IsAny<DebugFilter>())).ReturnsAsync(mockQueries);
         _mockStorage.Setup(x => x.GetLogsAsync(It.IsAny<DebugFilter>())).ReturnsAsync(mockLogs);
         _mockStorage.Setup(x => x.GetExceptionsAsync(It.IsAny<DebugFilter>())).ReturnsAsync(mockExceptions);
+        _mockStorage.Setup(x => x.GetDumpsAsync(It.IsAny<DebugFilter>())).ReturnsAsync(mockDumps);
+        _mockStorage.Setup(x => x.GetOutgoingHttpAsync(It.IsAny<DebugFilter>())).ReturnsAsync(mockHttpCalls);
 
         // Act
         var result = await controller.ExportData();
@@ -277,6 +287,8 @@ public class DebugApiControllerTests
                    .ReturnsAsync(new PagedResult<LogEntry> { Items = new List<LogEntry>() });
         _mockStorage.Setup(x => x.GetExceptionsAsync(It.IsAny<DebugFilter>()))
                    .ReturnsAsync(new PagedResult<ExceptionEntry> { Items = new List<ExceptionEntry>() });
+        _mockStorage.Setup(x => x.GetDumpsAsync(It.IsAny<DebugFilter>()))
+                   .ReturnsAsync(new PagedResult<DumpEntry> { Items = new List<DumpEntry>() });
 
         // Act
         var result = await _controller.Search(term, types);

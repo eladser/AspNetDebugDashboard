@@ -22,11 +22,20 @@ public static class DebugLogger
     /// </summary>
     public static async Task LogAsync(string message, string level, string? tag = null, Dictionary<string, object>? properties = null)
     {
-        var debugLogger = GetService<IDebugLogger>();
-        
-        if (debugLogger != null)
+        // a debug helper must never break the app calling it. With several hosts in
+        // one process (parallel integration tests) the static provider belongs to
+        // whichever host started last, and resolving from it can throw.
+        try
         {
-            await debugLogger.LogAsync(message, level, tag, properties);
+            var debugLogger = GetService<IDebugLogger>();
+            if (debugLogger != null)
+            {
+                await debugLogger.LogAsync(message, level, tag, properties);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"DebugLogger: {ex.Message}");
         }
     }
     
@@ -77,7 +86,7 @@ public static class DebugLogger
     
     private static IServiceProvider? ServiceProvider { get; set; }
     
-    internal static void SetServiceProvider(IServiceProvider serviceProvider)
+    internal static void SetServiceProvider(IServiceProvider? serviceProvider)
     {
         ServiceProvider = serviceProvider;
     }

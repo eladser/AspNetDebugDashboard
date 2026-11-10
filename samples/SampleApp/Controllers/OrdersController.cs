@@ -56,6 +56,7 @@ public class OrdersController : ControllerBase
         try
         {
             var createdOrder = await _orderService.CreateAsync(order);
+            DebugDump.Dump(createdOrder, "created order");
             return CreatedAtAction(nameof(GetById), new { id = createdOrder.Id }, createdOrder);
         }
         catch (Exception ex)

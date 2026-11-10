@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using System.Diagnostics;
 using System.Text;
-using System.Text.Json;
 
 namespace AspNetDebugDashboard.Middleware;
 
@@ -39,6 +38,7 @@ public class DebugRequestMiddleware
         // Register the request so the EF interceptor and IDebugLogger can
         // attach queries/logs to it while it's in flight.
         _debugContext.StartRequest(requestId, new RequestEntry { RequestId = requestId });
+        DebugContext.Current.Value = new RequestScope(requestId, Activity.Current?.TraceId.ToHexString());
 
         try
         {
@@ -74,6 +74,10 @@ public class DebugRequestMiddleware
             stopwatch.Stop();
             await LogRequestAsync(context, requestId, requestBody, responseBody, stopwatch.ElapsedMilliseconds, ex);
             throw;
+        }
+        finally
+        {
+            DebugContext.Current.Value = null;
         }
     }
 
@@ -159,8 +163,15 @@ public class DebugRequestMiddleware
             }
 
             var request = context.Request;
-            requestBody = RedactSensitiveFields(requestBody);
-            responseBody = RedactSensitiveFields(responseBody);
+            requestBody = Redactor.RedactBody(requestBody, _config.RedactedBodyFields);
+            responseBody = Redactor.RedactBody(responseBody, _config.RedactedBodyFields);
+
+            // next() threw before the response started, so StatusCode is still whatever
+            // ASP.NET Core defaults it to (200) rather than the 500 the client will actually
+            // get. If the response already started, whatever status was written stands.
+            var statusCode = exception != null && !context.Response.HasStarted
+                ? StatusCodes.Status500InternalServerError
+                : context.Response.StatusCode;
 
             var requestEntry = new RequestEntry
             {
@@ -175,7 +186,7 @@ public class DebugRequestMiddleware
                 Headers = headers,
                 RequestBody = requestBody,
                 ResponseBody = responseBody,
-                StatusCode = context.Response.StatusCode,
+                StatusCode = statusCode,
                 ExecutionTimeMs = elapsedMs,
                 Timestamp = DateTime.UtcNow,
                 UserAgent = request.Headers.UserAgent.ToString(),
@@ -193,6 +204,8 @@ public class DebugRequestMiddleware
             {
                 requestEntry.SqlQueries = tracked.SqlQueries;
                 requestEntry.Logs = tracked.Logs;
+                requestEntry.Dumps = tracked.Dumps;
+                requestEntry.OutgoingHttp = tracked.OutgoingHttp;
             }
 
             await _storage.StoreRequestAsync(requestEntry);
@@ -230,88 +243,6 @@ public class DebugRequestMiddleware
             Console.WriteLine($"Error logging request: {ex.Message}");
         }
     }
-
-    // Replaces password/token/etc. field values in a JSON or form-urlencoded body with
-    // "***" before it gets stored. Other bodies are left as they are.
-    private string RedactSensitiveFields(string body)
-    {
-        if (string.IsNullOrWhiteSpace(body) || _config.RedactedBodyFields.Count == 0) return body;
-
-        try
-        {
-            using var doc = JsonDocument.Parse(body);
-            var redacted = false;
-            using var stream = new MemoryStream();
-            using (var writer = new Utf8JsonWriter(stream))
-            {
-                WriteRedacted(doc.RootElement, writer, ref redacted);
-            }
-
-            // Nothing matched: return the original bytes untouched instead of a
-            // re-serialized (differently-formatted) copy.
-            return redacted ? Encoding.UTF8.GetString(stream.ToArray()) : body;
-        }
-        catch (JsonException)
-        {
-            return RedactFormFields(body);
-        }
-    }
-
-    // a=1&password=x style bodies (HTML form logins). Real form bodies never contain raw
-    // whitespace, which keeps plain text and XML out of this path.
-    private string RedactFormFields(string body)
-    {
-        if (!body.Contains('=') || body.Any(char.IsWhiteSpace)) return body;
-
-        var redacted = false;
-        var pairs = body.Split('&').Select(pair =>
-        {
-            var eq = pair.IndexOf('=');
-            if (eq <= 0 || !IsSensitiveField(Uri.UnescapeDataString(pair[..eq].Replace('+', ' ')))) return pair;
-            redacted = true;
-            return pair[..eq] + "=***";
-        }).ToList();
-
-        return redacted ? string.Join('&', pairs) : body;
-    }
-
-    private void WriteRedacted(JsonElement element, Utf8JsonWriter writer, ref bool redacted)
-    {
-        switch (element.ValueKind)
-        {
-            case JsonValueKind.Object:
-                writer.WriteStartObject();
-                foreach (var prop in element.EnumerateObject())
-                {
-                    writer.WritePropertyName(prop.Name);
-                    if (IsSensitiveField(prop.Name))
-                    {
-                        writer.WriteStringValue("***");
-                        redacted = true;
-                    }
-                    else
-                    {
-                        WriteRedacted(prop.Value, writer, ref redacted);
-                    }
-                }
-                writer.WriteEndObject();
-                break;
-            case JsonValueKind.Array:
-                writer.WriteStartArray();
-                foreach (var item in element.EnumerateArray())
-                {
-                    WriteRedacted(item, writer, ref redacted);
-                }
-                writer.WriteEndArray();
-                break;
-            default:
-                element.WriteTo(writer);
-                break;
-        }
-    }
-
-    private bool IsSensitiveField(string name) =>
-        _config.RedactedBodyFields.Any(field => name.Contains(field, StringComparison.OrdinalIgnoreCase));
 
     private static string GetClientIpAddress(HttpContext context)
     {

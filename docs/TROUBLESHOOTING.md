@@ -45,6 +45,35 @@ Work through these in order:
 
 Only entries written through this package's logger are captured: `IDebugLogger` (injected) or the static `DebugLogger`. Output from `ILogger<T>` / Serilog / NLog is **not** picked up; that's a different pipeline.
 
+## Outgoing HTTP calls don't show up
+
+1. `CaptureOutgoingHttp` must be true (it is by default).
+
+2. Calls made outside a request (hosted services, startup, timers) are skipped unless `CaptureUnattachedOutgoingHttp = true`.
+
+3. Capture rides on the runtime's HTTP diagnostic events, which only fire while activity propagation is on. If anything sets the `System.Net.Http.EnableActivityPropagation` AppContext switch to `false`, or the `DOTNET_SYSTEM_NET_HTTP_ENABLEACTIVITYPROPAGATION` environment variable to `false` or `0`, nothing is captured. Some tracing setups and container images set it; check your `runtimeconfig.json` and environment.
+
+4. Only `HttpClient` is covered. `HttpWebRequest`, gRPC over a non-`HttpClient` transport, and raw sockets aren't.
+
+If a call shows up with no response body even though `CaptureOutgoingHttpBodies` is on, the caller never read the response (for example `GetStringAsync` throwing on a 4xx before reading it). Request bodies are only captured when they're already in memory (`StringContent`, `JsonContent`, form content); a `StreamContent` body is skipped so capture doesn't consume it.
+
+## Live updates don't work (the list only refreshes every 5 seconds)
+
+The dashboard listens on `/_debug/api/stream` (server-sent events). If that stream can't open within 5 seconds, drops, or goes 45 seconds without a message, it quietly switches to polling every 5 seconds. So the page still works; it's just slower to update. The usual causes:
+
+- **A proxy buffers the response.** SSE needs every write flushed straight to the browser. The endpoint sends `X-Accel-Buffering: no`, which nginx honors, so nginx works without extra config. IIS with ARR, Azure Front Door, Cloudflare, and other CDNs or reverse proxies may hold the response until it ends. Turn response buffering off for the stream path (`/_debug/api/stream`, or under your `BasePath`), or reach the app directly during development.
+- **Response compression.** Don't add `text/event-stream` to `ResponseCompressionOptions.MimeTypes` (it isn't there by default). A compressor buffers output until it has a full block, so events arrive late or in bursts.
+- **Too many tabs over HTTP/1.1.** Browsers allow six connections per origin on HTTP/1.1, and each open dashboard tab keeps one stream open. With several tabs (plus the rest of the suite, or your app's own pages) new requests can queue behind them. Close some tabs, or serve over HTTPS where Kestrel negotiates HTTP/2 and the limit doesn't apply.
+- `EnableRealTimeUpdates` is false. The endpoint then returns 404 and the UI polls, which is the intended behavior.
+
+To check the stream directly:
+
+```bash
+curl -N http://localhost:5000/_debug/api/stream
+```
+
+You should see `retry: 5000` at once, then an `event: entry` line whenever something is captured, and `event: ping` every 15 seconds when it's idle. If lines only show up in chunks, something between you and the app is buffering.
+
 ## Queries/logs aren't attached to their request
 
 Entries are correlated by `HttpContext.TraceIdentifier` while the request is in flight. Work done outside a request (background services, startup seeding, hosted jobs) is still captured, but lands unattached, so you'll see it in the Queries/Logs tabs with no parent request link.
@@ -60,6 +89,10 @@ When in doubt: stop the app, delete `debug-dashboard.db` *and* `debug-dashboard-
 
 ## Memory or disk usage grows too much
 
+Cleanup runs every `CleanupInterval` (1 hour by default): it deletes entries older than `RetentionPeriod`, trims each entry type to `MaxEntries`, and if the database plus its `-log.db` file is still over `MaxDatabaseSize` (100MB), deletes the oldest entries and compacts the file. Before 2.4 the interval, retention period, and size cap were ignored, so an old database may shrink noticeably on the first run after upgrading. Details in [CONFIGURATION.md](CONFIGURATION.md#how-cleanup-works).
+
+To keep less:
+
 ```csharp
 builder.Services.AddDebugDashboard(config =>
 {
@@ -68,6 +101,7 @@ builder.Services.AddDebugDashboard(config =>
     config.LogResponseBodies = false;
     config.MaxBodySize = 64 * 1024;     // cap captured body size
     config.RetentionPeriod = TimeSpan.FromDays(1);
+    config.MaxDatabaseSize = 20 * 1024 * 1024;
 });
 ```
 
@@ -83,9 +117,13 @@ config.ExcludedPaths = new() { "/_debug", "/health", "/metrics", "/api/file-uplo
 
 Matching is contains-based on the path.
 
+## DebugLogger or DebugDump entries land in the wrong app (integration tests)
+
+`DebugLogger` and `DebugDump` are static, so they belong to whichever host called `UseDebugDashboard()` last. With several `WebApplicationFactory` hosts running in parallel in one test process, entries can end up in another host's store or get dropped. They never throw into your code. Run those test classes sequentially (an xUnit collection, or `DisableTestParallelization`) if you assert on them. The injected `IDebugLogger` doesn't have this problem.
+
 ## Version requirements
 
-- .NET 8, 9, or 10
+- .NET 8, 9, 10, or 11
 - EF Core 8+ (matching your target framework) for query capture
 - The 2.x dashboard requires no external resources. If the page loads blank, check the browser console and open an issue with what you see
 

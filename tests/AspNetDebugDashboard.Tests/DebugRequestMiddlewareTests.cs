@@ -3,6 +3,7 @@ using AspNetDebugDashboard.Middleware;
 using AspNetDebugDashboard.Core.Services;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Options;
 using Moq;
 using System.Text;
@@ -200,13 +201,38 @@ public class DebugRequestMiddlewareTests
         // Act & Assert
         await Assert.ThrowsAsync<InvalidOperationException>(() => middleware.InvokeAsync(context));
         
-        _mockStorage.Verify(x => x.StoreRequestAsync(It.Is<RequestEntry>(r => 
-            r.Exception != null
+        _mockStorage.Verify(x => x.StoreRequestAsync(It.Is<RequestEntry>(r =>
+            r.Exception != null &&
+            r.StatusCode == 500
         )), Times.Once);
-        
-        _mockStorage.Verify(x => x.StoreExceptionAsync(It.Is<ExceptionEntry>(e => 
-            e.Message == "Test exception" && 
+
+        _mockStorage.Verify(x => x.StoreExceptionAsync(It.Is<ExceptionEntry>(e =>
+            e.Message == "Test exception" &&
             e.ExceptionType == "InvalidOperationException"
+        )), Times.Once);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_WithExceptionAfterResponseStarted_KeepsTheStatusAlreadyWritten()
+    {
+        // Arrange
+        var middleware = new DebugRequestMiddleware(_mockNext.Object, _mockOptions.Object, _mockStorage.Object, new DebugContext());
+        var context = CreateHttpContext();
+
+        _mockNext.Setup(x => x(context))
+                 .Callback(() => context.Features.Set<IHttpResponseFeature>(new StartedResponseFeature { StatusCode = 503 }))
+                 .ThrowsAsync(new InvalidOperationException("Test exception"));
+
+        _mockStorage.Setup(x => x.StoreRequestAsync(It.IsAny<RequestEntry>()))
+                   .ReturnsAsync("test-id");
+        _mockStorage.Setup(x => x.StoreExceptionAsync(It.IsAny<ExceptionEntry>()))
+                   .ReturnsAsync("exception-id");
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(() => middleware.InvokeAsync(context));
+
+        _mockStorage.Verify(x => x.StoreRequestAsync(It.Is<RequestEntry>(r =>
+            r.StatusCode == 503
         )), Times.Once);
     }
 
@@ -347,7 +373,20 @@ public class DebugRequestMiddlewareTests
         context.Request.Host = new HostString("localhost", 5001);
         context.Response.Body = new MemoryStream();
         context.TraceIdentifier = Guid.NewGuid().ToString();
-        
+
         return context;
+    }
+
+    // DefaultHttpContext's built-in response feature never flips HasStarted, so the
+    // "response already started" test needs one that actually reports it.
+    private sealed class StartedResponseFeature : IHttpResponseFeature
+    {
+        public int StatusCode { get; set; } = 200;
+        public string? ReasonPhrase { get; set; }
+        public IHeaderDictionary Headers { get; set; } = new HeaderDictionary();
+        public Stream Body { get; set; } = new MemoryStream();
+        public bool HasStarted => true;
+        public void OnStarting(Func<object, Task> callback, object state) { }
+        public void OnCompleted(Func<object, Task> callback, object state) { }
     }
 }

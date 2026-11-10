@@ -14,15 +14,15 @@ public static class StorageExtensions
         services.AddSingleton<IDebugStorage>(provider =>
         {
             var connectionString = config.DatabasePath;
-            return new LiteDbStorage(connectionString, config);
+            var eventBus = provider.GetRequiredService<DebugEventBus>();
+            return new LiteDbStorage(connectionString, config, eventBus);
         });
-        
-        services.AddHostedService<StorageCleanupService>();
-        
+
         return services;
     }
 }
 
+[Obsolete("Duplicated DebugDashboardCleanupService, which now honors RetentionPeriod/CleanupInterval/MaxDatabaseSize. Never registered by AddDebugDashboard.")]
 public class StorageCleanupService : BackgroundService
 {
     private readonly IDebugStorage _storage;

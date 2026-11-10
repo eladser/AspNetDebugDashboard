@@ -73,6 +73,19 @@ public static class DebugTools
     public static Task<string> Performance(DashboardClient client, CancellationToken ct)
         => client.GetAsync("/performance", ct);
 
+    [McpServerTool(Name = "recent_dumps")]
+    [Description("Most recent DebugDump.Dump() snapshots, newest first: label, type, source file/line, and the captured JSON. Filter by requestId to see only dumps from one request.")]
+    public static Task<string> RecentDumps(
+        DashboardClient client,
+        [Description("How many to return (default 20).")] int count = 20,
+        [Description("Only return dumps captured during this request.")] string? requestId = null,
+        CancellationToken ct = default)
+    {
+        var q = $"/dumps?page=1&pageSize={count}&sortBy=timestamp&sortDescending=true";
+        if (!string.IsNullOrWhiteSpace(requestId)) q += $"&requestId={Uri.EscapeDataString(requestId)}";
+        return client.GetAsync(q, ct);
+    }
+
     [McpServerTool(Name = "search")]
     [Description("Search across requests, queries, logs, and exceptions for a term.")]
     public static Task<string> Search(
@@ -80,4 +93,19 @@ public static class DebugTools
         [Description("The text to search for.")] string term,
         CancellationToken ct = default)
         => client.GetAsync($"/search?term={Uri.EscapeDataString(term)}", ct);
+
+    [McpServerTool(Name = "recent_outgoing_http")]
+    [Description("Most recent outgoing HTTP calls made by the app (HttpClient), newest first. Set failedOnly for calls that errored or returned 4xx/5xx. Set requestId to see only calls made during one inbound request.")]
+    public static Task<string> RecentOutgoingHttp(
+        DashboardClient client,
+        [Description("How many to return (default 20).")] int count = 20,
+        [Description("Only return calls that failed (no response, or status >= 400).")] bool failedOnly = false,
+        [Description("Only return calls made while handling this request id.")] string? requestId = null,
+        CancellationToken ct = default)
+    {
+        var q = $"/http-requests?page=1&pageSize={count}&sortBy=timestamp&sortDescending=true";
+        if (failedOnly) q += "&isSuccessful=false";
+        if (!string.IsNullOrWhiteSpace(requestId)) q += $"&requestId={Uri.EscapeDataString(requestId)}";
+        return client.GetAsync(q, ct);
+    }
 }

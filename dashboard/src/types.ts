@@ -27,6 +27,8 @@ export interface RequestEntry extends EntryBase {
   ipAddress?: string | null;
   sqlQueries: SqlQueryEntry[];
   logs: LogEntry[];
+  dumps: DumpEntry[];
+  outgoingHttp: OutgoingHttpEntry[];
   exception?: string | null;
   requestSize: number;
   responseSize: number;
@@ -59,6 +61,21 @@ export interface LogEntry extends EntryBase {
   machineName?: string | null;
 }
 
+export interface OutgoingHttpEntry extends EntryBase {
+  method: string;
+  url: string;
+  host: string;
+  statusCode?: number | null;
+  executionTimeMs: number;
+  requestHeaders: Record<string, string>;
+  responseHeaders: Record<string, string>;
+  requestBody?: string | null;
+  responseBody?: string | null;
+  error?: string | null;
+  exceptionType?: string | null;
+  traceId?: string | null;
+}
+
 export interface ExceptionEntry extends EntryBase {
   message: string;
   stackTrace?: string | null;
@@ -74,6 +91,16 @@ export interface ExceptionEntry extends EntryBase {
   requestBody?: string | null;
   headers: Record<string, string>;
   targetSite?: string | null;
+}
+
+export interface DumpEntry extends EntryBase {
+  label?: string | null;
+  typeName: string;
+  json: string;
+  truncated: boolean;
+  file?: string | null;
+  line: number;
+  member?: string | null;
 }
 
 export interface PagedResult<T> {
@@ -106,6 +133,8 @@ export interface DebugStats {
   totalSqlQueries: number;
   totalExceptions: number;
   totalLogs: number;
+  totalDumps: number;
+  totalOutgoingHttp: number;
   averageResponseTime: number;
   averageSqlTime: number;
   statusCodeDistribution: Record<string, number>;
@@ -129,6 +158,7 @@ export interface ListQuery {
   isSlowQuery?: boolean;
   minExecutionTime?: number;
   requestId?: string;
+  host?: string;
 }
 
 export interface EndpointPerf {
@@ -150,6 +180,6 @@ export interface PerfMetrics {
 }
 
 export interface SearchHit {
-  type: 'request' | 'query' | 'log' | 'exception';
+  type: 'request' | 'query' | 'log' | 'exception' | 'dump' | 'http';
   data: Record<string, unknown>;
 }

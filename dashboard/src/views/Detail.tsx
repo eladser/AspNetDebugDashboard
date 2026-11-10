@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
-import type { ExceptionEntry, LogEntry, RequestEntry, SqlQueryEntry } from '../types';
+import type { DumpEntry, ExceptionEntry, LogEntry, OutgoingHttpEntry, RequestEntry, SqlQueryEntry } from '../types';
 import { fmtBytes, fmtDateTime, fmtDuration, prettyBody } from '../format';
 import { CodeBlock, CopyButton, LevelTag, MethodTag, StatusCode } from '../ui';
 import { highlightSql } from '../sql';
 import { toCurl } from '../curl';
+import { JsonTree } from '../json';
 
 export type DetailRef =
   | { kind: 'request'; id: string }
   | { kind: 'query'; id: string }
   | { kind: 'log'; id: string }
-  | { kind: 'exception'; id: string };
+  | { kind: 'exception'; id: string }
+  | { kind: 'dump'; id: string }
+  | { kind: 'http'; id: string };
 
 function KV({ rows }: { rows: [string, React.ReactNode][] }) {
   return (
@@ -76,12 +79,14 @@ function findNPlusOne(queries: SqlQueryEntry[]): { query: string; count: number 
   return worst;
 }
 
-type ReqTab = 'summary' | 'headers' | 'request' | 'response' | 'sql' | 'logs';
+type ReqTab = 'summary' | 'headers' | 'request' | 'response' | 'sql' | 'http' | 'logs' | 'dumps';
 
 function RequestDetail({ entry, onOpen }: { entry: RequestEntry; onOpen: (ref: DetailRef) => void }) {
   const [tab, setTab] = useState<ReqTab>('summary');
   const queries = entry.sqlQueries ?? [];
   const logs = entry.logs ?? [];
+  const dumps = entry.dumps ?? [];
+  const outgoing = entry.outgoingHttp ?? [];
   const nPlusOne = useMemo(() => findNPlusOne(queries), [queries]);
   const sqlTotal = queries.reduce((s, q) => s + q.executionTimeMs, 0);
 
@@ -91,7 +96,9 @@ function RequestDetail({ entry, onOpen }: { entry: RequestEntry; onOpen: (ref: D
     { id: 'request', label: 'Request' },
     { id: 'response', label: 'Response' },
     { id: 'sql', label: 'SQL', n: queries.length },
+    { id: 'http', label: 'HTTP', n: outgoing.length },
     { id: 'logs', label: 'Logs', n: logs.length },
+    { id: 'dumps', label: 'Dumps', n: dumps.length },
   ];
 
   return (
@@ -159,6 +166,18 @@ function RequestDetail({ entry, onOpen }: { entry: RequestEntry; onOpen: (ref: D
           </>
         )}
 
+        {tab === 'http' && (
+          outgoing.length === 0
+            ? <div className="state-box"><div>No outgoing calls made during this request</div></div>
+            : outgoing.map((h) => (
+                <div key={h.id} className="sub-row" onClick={() => onOpen({ kind: 'http', id: h.id })}>
+                  <MethodTag method={h.method} />
+                  <span className="grow">{h.url}</span>
+                  {h.statusCode ? <StatusCode code={h.statusCode} /> : <span className="level error">ERR</span>}
+                </div>
+              ))
+        )}
+
         {tab === 'logs' && (
           logs.length === 0
             ? <div className="state-box"><div>No logs written during this request</div></div>
@@ -166,6 +185,17 @@ function RequestDetail({ entry, onOpen }: { entry: RequestEntry; onOpen: (ref: D
                 <div key={l.id} className="sub-row" onClick={() => onOpen({ kind: 'log', id: l.id })}>
                   <LevelTag level={l.level} />
                   <span className="grow">{l.message}</span>
+                </div>
+              ))
+        )}
+
+        {tab === 'dumps' && (
+          dumps.length === 0
+            ? <div className="state-box"><div>No DebugDump.Dump() calls during this request</div></div>
+            : dumps.map((d) => (
+                <div key={d.id} className="sub-row" onClick={() => onOpen({ kind: 'dump', id: d.id })}>
+                  <span className="grow">{d.label ?? d.typeName}</span>
+                  <span className="dim">{d.typeName.split('.').pop()}</span>
                 </div>
               ))
         )}
@@ -230,6 +260,69 @@ function QueryDetail({ entry, onOpen }: { entry: SqlQueryEntry; onOpen: (ref: De
         </Section>
       )}
     </div>
+  );
+}
+
+type HttpTab = 'summary' | 'request' | 'response';
+
+function OutgoingHttpDetail({ entry, onOpen }: { entry: OutgoingHttpEntry; onOpen: (ref: DetailRef) => void }) {
+  const [tab, setTab] = useState<HttpTab>('summary');
+
+  const tabs: { id: HttpTab; label: string; n?: number }[] = [
+    { id: 'summary', label: 'Summary' },
+    { id: 'request', label: 'Request', n: Object.keys(entry.requestHeaders ?? {}).length },
+    { id: 'response', label: 'Response', n: Object.keys(entry.responseHeaders ?? {}).length },
+  ];
+
+  return (
+    <>
+      <Tabs tabs={tabs} active={tab} onSelect={setTab} />
+      <div className="detail-body">
+        {tab === 'summary' && (
+          <>
+            <KV
+              rows={[
+                ['Status', entry.statusCode ? <StatusCode code={entry.statusCode} /> : <span className="level error">failed</span>],
+                ['Duration', fmtDuration(entry.executionTimeMs)],
+                ['Host', entry.host],
+                ['Time', fmtDateTime(entry.timestamp)],
+                ['Trace ID', entry.traceId],
+                ['Request', <ParentRequestLink requestId={entry.requestId} onOpen={onOpen} />],
+              ]}
+            />
+            {entry.error && (
+              <Section title="Error">
+                <CodeBlock text={`${entry.exceptionType ?? 'Error'}: ${entry.error}`} />
+              </Section>
+            )}
+          </>
+        )}
+
+        {tab === 'request' && (
+          <>
+            <HeadersBlock headers={entry.requestHeaders} />
+            {entry.requestBody && (
+              <Section title="Body">
+                <CodeBlock text={prettyBody(entry.requestBody)} />
+              </Section>
+            )}
+          </>
+        )}
+
+        {tab === 'response' && (
+          <>
+            <HeadersBlock headers={entry.responseHeaders} />
+            {entry.responseBody
+              ? (
+                <Section title="Body">
+                  <CodeBlock text={prettyBody(entry.responseBody)} />
+                </Section>
+              )
+              : <div className="state-box"><div>No response body captured. Enable <code>CaptureOutgoingHttpBodies</code> in config</div></div>}
+          </>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -307,11 +400,33 @@ function ExceptionDetail({ entry, onOpen }: { entry: ExceptionEntry; onOpen: (re
   );
 }
 
+function DumpDetail({ entry, onOpen }: { entry: DumpEntry; onOpen: (ref: DetailRef) => void }) {
+  return (
+    <div className="detail-body">
+      <KV
+        rows={[
+          ['Type', entry.typeName],
+          ['Time', fmtDateTime(entry.timestamp)],
+          ['Source', entry.file ? `${entry.file}:${entry.line}` : null],
+          ['Member', entry.member],
+          ['Truncated', entry.truncated ? 'yes, hit a depth/item/size limit' : null],
+          ['Request', <ParentRequestLink requestId={entry.requestId} onOpen={onOpen} />],
+        ]}
+      />
+      <Section title="Value">
+        <JsonTree json={entry.json} />
+      </Section>
+    </div>
+  );
+}
+
 const fetchers = {
   request: api.request,
   query: api.query,
   log: api.log,
   exception: api.exception,
+  dump: api.dump,
+  http: api.outgoingHttpCall,
 };
 
 export function DetailPanel({
@@ -323,7 +438,7 @@ export function DetailPanel({
   onClose: () => void;
   onOpen: (ref: DetailRef) => void;
 }) {
-  const [entry, setEntry] = useState<RequestEntry | SqlQueryEntry | LogEntry | ExceptionEntry | null>(null);
+  const [entry, setEntry] = useState<RequestEntry | SqlQueryEntry | LogEntry | ExceptionEntry | DumpEntry | OutgoingHttpEntry | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -397,6 +512,31 @@ export function DetailPanel({
           </>
         );
         body = <ExceptionDetail entry={x} onOpen={onOpen} />;
+        break;
+      }
+      case 'dump': {
+        const d = entry as DumpEntry;
+        title = d.label ?? d.typeName;
+        meta = (
+          <>
+            <span className="dim">{d.typeName}</span>
+            <span>{fmtDateTime(d.timestamp)}</span>
+          </>
+        );
+        body = <DumpDetail entry={d} onOpen={onOpen} />;
+        break;
+      }
+      case 'http': {
+        const h = entry as OutgoingHttpEntry;
+        title = <><MethodTag method={h.method} /> {h.url}</>;
+        meta = (
+          <>
+            {h.statusCode ? <StatusCode code={h.statusCode} /> : <span className="level error">FAILED</span>}
+            <span>{fmtDuration(h.executionTimeMs)}</span>
+            <span>{fmtDateTime(h.timestamp)}</span>
+          </>
+        );
+        body = <OutgoingHttpDetail entry={h} onOpen={onOpen} />;
         break;
       }
     }

@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
+
 namespace SampleApp.Models;
 
 public class Product
@@ -24,6 +26,7 @@ public class Order
 {
     public int Id { get; set; }
     public int CustomerId { get; set; }
+    [ValidateNever]
     public Customer Customer { get; set; } = null!;
     public DateTime OrderDate { get; set; } = DateTime.UtcNow;
     public decimal TotalAmount { get; set; }
@@ -35,8 +38,10 @@ public class OrderItem
 {
     public int Id { get; set; }
     public int OrderId { get; set; }
+    [ValidateNever]
     public Order Order { get; set; } = null!;
     public int ProductId { get; set; }
+    [ValidateNever]
     public Product Product { get; set; } = null!;
     public int Quantity { get; set; }
     public decimal UnitPrice { get; set; }

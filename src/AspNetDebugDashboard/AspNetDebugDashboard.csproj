@@ -1,14 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <TargetFrameworks>net8.0;net9.0;net10.0;net11.0</TargetFrameworks>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <PackageId>AspNetDebugDashboard</PackageId>
     <Title>ASP.NET Debug Dashboard</Title>
-    <Version>2.3.0</Version>
-    <AssemblyVersion>2.2.0</AssemblyVersion>
-    <FileVersion>2.2.0</FileVersion>
+    <Version>2.4.0</Version>
+    <AssemblyVersion>2.4.0</AssemblyVersion>
+    <FileVersion>2.4.0</FileVersion>
     <Authors>Elad Sertshuk</Authors>
     <Description>Request, SQL query, log, and exception capture for ASP.NET Core, viewable in a dashboard served at /_debug. Inspired by Laravel Telescope. LiteDB storage, EF Core interceptor, zero-config setup.</Description>
     <PackageProjectUrl>https://github.com/eladser/AspNetDebugDashboard</PackageProjectUrl>
@@ -18,7 +18,7 @@
     <PackageTags>aspnetcore;debugging;dashboard;telescope;logging;monitoring;efcore;middleware;developer-tools</PackageTags>
     <RepositoryUrl>https://github.com/eladser/AspNetDebugDashboard</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageReleaseNotes>In 2.3.0 the UI, API, and EF interceptor check a new AllowedEnvironments option (default: Development only) themselves, so dashboard requests outside it get a 404, and an optional AuthorizationFilter can reject any dashboard request with a 401. Default ExcludedHeaders now also cover Set-Cookie, X-Api-Key, X-Auth-Token, and Proxy-Authorization, and a new RedactedBodyFields option (default: password, secret, token, apikey) stores matching fields in captured JSON and form-urlencoded bodies as ***. EmitActivities = false and custom BasePath values now work, and the unused SignalR hub is gone, so EnableRealTimeUpdates and AddDebugDashboardSignalR() are obsolete and do nothing. Older versions are in the changelog: https://github.com/eladser/AspNetDebugDashboard/blob/main/CHANGELOG.md</PackageReleaseNotes>
+    <PackageReleaseNotes>2.4.0 adds a net11.0 target, outgoing HttpClient capture (on by default, bodies opt-in via CaptureOutgoingHttpBodies), DebugDump.Dump(value) for snapshotting objects at the call site, and live updates over server-sent events instead of polling (EnableRealTimeUpdates, on by default). RetentionPeriod, CleanupInterval and MaxDatabaseSize are enforced now, the static DebugLogger works, and a request whose handler threw is recorded as 500 instead of 200. Custom IDebugStorage implementations need the new members listed in docs/API.md. Full list in the changelog: https://github.com/eladser/AspNetDebugDashboard/blob/main/CHANGELOG.md</PackageReleaseNotes>
     <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest</AnalysisLevel>
@@ -43,6 +43,10 @@
   <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.12" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net11.0'">
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="11.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="11.0.0" />
   </ItemGroup>
 
   <ItemGroup>

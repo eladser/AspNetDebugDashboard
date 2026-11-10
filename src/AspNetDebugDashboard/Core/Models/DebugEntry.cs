@@ -31,6 +31,8 @@ public class RequestEntry : DebugEntry
     public string? IPAddress { get; set; }
     public List<SqlQueryEntry> SqlQueries { get; set; } = new();
     public List<LogEntry> Logs { get; set; } = new();
+    public List<OutgoingHttpEntry> OutgoingHttp { get; set; } = new();
+    public List<DumpEntry> Dumps { get; set; } = new();
     public string? Exception { get; set; }
     public long RequestSize { get; set; }
     public long ResponseSize { get; set; }
@@ -86,4 +88,31 @@ public class ExceptionEntry : DebugEntry
     public string? TargetSite { get; set; }
     public int? HResult { get; set; }
     public string? HelpLink { get; set; }
+}
+
+public class OutgoingHttpEntry : DebugEntry
+{
+    public string Method { get; set; } = string.Empty;
+    public string Url { get; set; } = string.Empty;
+    public string Host { get; set; } = string.Empty;
+    public int? StatusCode { get; set; }
+    public long ExecutionTimeMs { get; set; }
+    public Dictionary<string, string> RequestHeaders { get; set; } = new();
+    public Dictionary<string, string> ResponseHeaders { get; set; } = new();
+    public string? RequestBody { get; set; }
+    public string? ResponseBody { get; set; }
+    public string? Error { get; set; }
+    public string? ExceptionType { get; set; }
+    public string? TraceId { get; set; }
+}
+
+public class DumpEntry : DebugEntry
+{
+    public string? Label { get; set; }
+    public string TypeName { get; set; } = string.Empty;
+    public string Json { get; set; } = string.Empty;
+    public bool Truncated { get; set; }
+    public string? File { get; set; }
+    public int Line { get; set; }
+    public string? Member { get; set; }
 }

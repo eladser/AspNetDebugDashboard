@@ -1,5 +1,6 @@
 import { createRef, useEffect, useRef, useState } from 'react';
 import { api } from './api';
+import { useLiveTick } from './live';
 import type { DebugStats, SearchHit } from './types';
 import { Overview } from './views/Overview';
 import { Performance } from './views/Performance';
@@ -7,10 +8,12 @@ import { Requests } from './views/Requests';
 import { Queries } from './views/Queries';
 import { Logs } from './views/Logs';
 import { Exceptions } from './views/Exceptions';
+import { Dumps } from './views/Dumps';
+import { OutgoingHttp } from './views/OutgoingHttp';
 import { DetailPanel, type DetailRef } from './views/Detail';
 import { LevelTag, MethodTag, StatusCode } from './ui';
 
-type Tab = 'overview' | 'performance' | 'requests' | 'queries' | 'logs' | 'exceptions';
+type Tab = 'overview' | 'performance' | 'requests' | 'queries' | 'outgoing' | 'logs' | 'exceptions' | 'dumps';
 
 const I = {
   pulse: <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1.5 8h3l2-4.5L10 12l2-4h2.5" /></svg>,
@@ -19,8 +22,10 @@ const I = {
   db: <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><ellipse cx="8" cy="3.5" rx="5.5" ry="2" /><path d="M2.5 3.5v9c0 1.1 2.46 2 5.5 2s5.5-.9 5.5-2v-9" /><path d="M2.5 8c0 1.1 2.46 2 5.5 2s5.5-.9 5.5-2" /></svg>,
   lines: <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2.5 4h11" /><path d="M2.5 8h7" /><path d="M2.5 12h9" /></svg>,
   alert: <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2 1.8 13h12.4L8 2z" /><path d="M8 6.5v3" /><circle cx="8" cy="11.5" r="0.3" fill="currentColor" /></svg>,
+  brace: <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M5.5 2.5c-1.4 0-1.8.7-1.8 1.8v1.9c0 1-.4 1.3-1.2 1.3.8 0 1.2.3 1.2 1.3v1.9c0 1.1.4 1.8 1.8 1.8" /><path d="M10.5 2.5c1.4 0 1.8.7 1.8 1.8v1.9c0 1 .4 1.3 1.2 1.3-.8 0-1.2.3-1.2 1.3v1.9c0 1.1-.4 1.8-1.8 1.8" /></svg>,
   search: <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="7" cy="7" r="4.5" /><path d="m13.5 13.5-3.2-3.2" /></svg>,
   logo: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="14" height="14" rx="3.5" stroke="var(--accent)" strokeWidth="1.5" /><path d="M4.5 8h2l1.5-3.5L10 11l1.5-3h0" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>,
+  globe: <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6.5" /><path d="M1.5 8h13" /><path d="M8 1.5c2 2 2.8 4.2 2.8 6.5S10 12.8 8 14.5C6 12.8 5.2 10.6 5.2 8S6 3.2 8 1.5Z" /></svg>,
 };
 
 const NAV: { group: string; tabs: { id: Tab; label: string; icon: React.ReactNode }[] }[] = [
@@ -36,6 +41,7 @@ const NAV: { group: string; tabs: { id: Tab; label: string; icon: React.ReactNod
     tabs: [
       { id: 'requests', label: 'Requests', icon: I.swap },
       { id: 'queries', label: 'Queries', icon: I.db },
+      { id: 'outgoing', label: 'Outgoing', icon: I.globe },
     ],
   },
   {
@@ -43,12 +49,12 @@ const NAV: { group: string; tabs: { id: Tab; label: string; icon: React.ReactNod
     tabs: [
       { id: 'logs', label: 'Logs', icon: I.lines },
       { id: 'exceptions', label: 'Exceptions', icon: I.alert },
+      { id: 'dumps', label: 'Dumps', icon: I.brace },
     ],
   },
 ];
 
 const ALL_TABS = NAV.flatMap((g) => g.tabs);
-const POLL_MS = 5000;
 
 // Sibling suite tools the server injected (Mailbox, Flags, Jobs, Vitals), if installed.
 interface SuitePanel { name: string; route: string; icon: string; }
@@ -116,7 +122,7 @@ function GlobalSearch({ onOpen }: { onOpen: (ref: DetailRef) => void }) {
     groups.get(k)!.push(h);
   }
 
-  const labels: Record<string, string> = { request: 'Requests', query: 'Queries', log: 'Logs', exception: 'Exceptions' };
+  const labels: Record<string, string> = { request: 'Requests', query: 'Queries', log: 'Logs', exception: 'Exceptions', dump: 'Dumps', http: 'Outgoing' };
 
   return (
     <div className="gsearch">
@@ -170,6 +176,15 @@ function GlobalSearch({ onOpen }: { onOpen: (ref: DetailRef) => void }) {
                     {type === 'exception' && (
                       <span className="grow" style={{ color: 'var(--err)' }}>{String(d.message ?? '')}</span>
                     )}
+                    {type === 'dump' && (
+                      <span className="grow">{String(d.label ?? d.typeName ?? '')}</span>
+                    )}
+                    {type === 'http' && (
+                      <>
+                        <MethodTag method={String(d.method ?? '')} />
+                        <span className="grow">{String(d.url ?? '')}</span>
+                      </>
+                    )}
                   </button>
                 );
               })}
@@ -184,7 +199,9 @@ function GlobalSearch({ onOpen }: { onOpen: (ref: DetailRef) => void }) {
 export default function App() {
   const [tab, setTabState] = useState<Tab>(tabFromHash);
   const [live, setLive] = useState(true);
-  const [tick, setTick] = useState(0);
+  const liveTick = useLiveTick(live);
+  const [manualTick, setManualTick] = useState(0);
+  const tick = liveTick + manualTick;
   const [detail, setDetail] = useState<DetailRef | null>(null);
   const [counts, setCounts] = useState<DebugStats | null>(null);
   const searchRef = createRef<HTMLInputElement>();
@@ -199,12 +216,6 @@ export default function App() {
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
-
-  useEffect(() => {
-    if (!live) return;
-    const t = window.setInterval(() => setTick((n) => n + 1), POLL_MS);
-    return () => window.clearInterval(t);
-  }, [live]);
 
   // sidebar counts piggyback on the same tick
   useEffect(() => {
@@ -230,8 +241,10 @@ export default function App() {
     switch (id) {
       case 'requests': return { n: counts.totalRequests };
       case 'queries': return { n: counts.totalSqlQueries };
+      case 'outgoing': return { n: counts.totalOutgoingHttp };
       case 'logs': return { n: counts.totalLogs };
       case 'exceptions': return { n: counts.totalExceptions, alert: counts.totalExceptions > 0 };
+      case 'dumps': return { n: counts.totalDumps };
       default: return null;
     }
   };
@@ -239,7 +252,7 @@ export default function App() {
   const clearAll = async () => {
     if (!window.confirm('Delete all captured data?')) return;
     await api.clearAll();
-    setTick((n) => n + 1);
+    setManualTick((n) => n + 1);
   };
 
   const viewProps = { tick, navEnabled: !detail, searchRef, onOpen: setDetail };
@@ -301,8 +314,10 @@ export default function App() {
         {tab === 'performance' && <Performance tick={tick} />}
         {tab === 'requests' && <Requests {...viewProps} />}
         {tab === 'queries' && <Queries {...viewProps} />}
+        {tab === 'outgoing' && <OutgoingHttp {...viewProps} />}
         {tab === 'logs' && <Logs {...viewProps} />}
         {tab === 'exceptions' && <Exceptions {...viewProps} />}
+        {tab === 'dumps' && <Dumps {...viewProps} />}
       </main>
 
       {detail && <DetailPanel refs={detail} onClose={() => setDetail(null)} onOpen={setDetail} />}
