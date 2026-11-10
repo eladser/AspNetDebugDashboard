@@ -2,6 +2,11 @@
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Security
+- AspNetMailbox 0.1.2 pins System.Security.Cryptography.Pkcs to 10.0.14. MimeKit 4.18.1 pulls in 10.0.0, which has two denial of service advisories, [GHSA-846f-f764-76mx](https://github.com/advisories/GHSA-846f-f764-76mx) (high) and [GHSA-2fmv-rv2c-59x7](https://github.com/advisories/GHSA-2fmv-rv2c-59x7) (moderate).
+
 ## [2.3.0] - 2026-09-30
 
 ### Security
