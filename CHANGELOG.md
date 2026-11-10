@@ -35,6 +35,9 @@ Existing setup is unchanged unless you implement `IDebugStorage` yourself (see C
 - `DebugLogger` (the static one) was never wired to a service provider, so `DebugLogger.InfoAsync`/`WarningAsync`/etc. did nothing. It's active whenever the dashboard is, and stays a no-op otherwise.
 - A request whose handler threw was recorded with `StatusCode` 200. It's recorded as 500 now, unless the response already started with a different status.
 
+### Security
+- AspNetMailbox 0.1.2 pins System.Security.Cryptography.Pkcs to 10.0.14. MimeKit 4.18.1 pulls in 10.0.0, which has two denial of service advisories, [GHSA-846f-f764-76mx](https://github.com/advisories/GHSA-846f-f764-76mx) (high) and [GHSA-2fmv-rv2c-59x7](https://github.com/advisories/GHSA-2fmv-rv2c-59x7) (moderate).
+
 ## [2.3.0] - 2026-09-30
 
 ### Security
