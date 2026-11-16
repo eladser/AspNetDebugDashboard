@@ -50,6 +50,8 @@ Install-Package AspNetDebugDashboard
 
 Works on .NET 8, 9, 10, and 11. No other setup files, schemas, or services needed. Storage is an embedded LiteDB database created on first run.
 
+The packages are published on NuGet by [eladser1](https://www.nuget.org/profiles/eladser1).
+
 ## Setup
 
 The minimum is two lines:
