@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildDraft, compareRows, countRedacted, parseHeaderLines, replayUrl, toFetchInit, type ReplayDraft } from './replay';
+import { buildDraft, compareRows, countRedacted, encodePath, parseHeaderLines, replayUrl, toFetchInit, type ReplayDraft } from './replay';
 import type { RequestEntry } from './types';
 
 const ORIGIN = 'http://localhost:5000';
@@ -160,6 +160,25 @@ describe('countRedacted', () => {
   it('counts across all texts', () => {
     expect(countRedacted('a=***&b=***', 'X-Token: ***', '')).toBe(3);
     expect(countRedacted('nothing here')).toBe(0);
+  });
+});
+
+describe('encodePath', () => {
+  it('re-escapes characters a decoded path loses', () => {
+    expect(encodePath('/a?b')).toBe('/a%3Fb');
+    expect(encodePath('/a#b')).toBe('/a%23b');
+    expect(encodePath('/a\\b')).toBe('/a%5Cb');
+    expect(encodePath('/100%')).toBe('/100%25');
+  });
+
+  it('leaves %2F alone and plain paths unchanged', () => {
+    expect(encodePath('/a%2Fb')).toBe('/a%2Fb');
+    expect(encodePath('/a%2fb')).toBe('/a%2fb');
+    expect(encodePath('/api/orders/7')).toBe('/api/orders/7');
+  });
+
+  it('keeps a captured backslash path on this origin', () => {
+    expect(replayUrl(encodePath('/\\evil.com/x'), ORIGIN)).toBe(`${ORIGIN}/%5Cevil.com/x`);
   });
 });
 

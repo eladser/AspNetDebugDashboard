@@ -15,7 +15,8 @@ type Result =
   | { state: 'sending' }
   | { state: 'waiting' }
   | { state: 'found'; replay: RequestEntry }
-  | { state: 'missing'; status: number; error?: string };
+  | { state: 'missing'; status: number; error?: string }
+  | { state: 'unsent'; error: string };
 
 const stop = (e: React.KeyboardEvent<HTMLElement>) => {
   if (e.key === 'Escape') (e.target as HTMLElement).blur();
@@ -51,12 +52,14 @@ export function Replay({ entry, onOpen }: { entry: RequestEntry; onOpen: (ref: D
     const live = () => id === run.current;
     setResult({ state: 'sending' });
 
-    // anything newer than this when polling is the replay we just sent
+    // anything newer than this when polling is the replay we just sent; without it an
+    // older replay could pass for this one, so don't send
     let before: string | undefined;
     try {
       before = (await api.requests({ page: 1, pageSize: 1, replayOf: entry.id })).items[0]?.id;
     } catch (e) {
-      console.warn('replay: could not list earlier replays', e);
+      if (live()) setResult({ state: 'unsent', error: e instanceof Error ? e.message : String(e) });
+      return;
     }
 
     let status = 0;
@@ -64,6 +67,7 @@ export function Replay({ entry, onOpen }: { entry: RequestEntry; onOpen: (ref: D
     try {
       const res = await fetch(url, toFetchInit({ ...draft, method, path, headerText, body }, entry.id));
       status = res.status;
+      res.body?.cancel().catch(() => {});
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     }
@@ -159,6 +163,16 @@ export function Replay({ entry, onOpen }: { entry: RequestEntry; onOpen: (ref: D
 function ReplayResult({ result, original, onOpen }: { result: Result; original: RequestEntry; onOpen: (ref: DetailRef) => void }) {
   if (result.state === 'sending') return <div className="replay-result dim">Sending…</div>;
   if (result.state === 'waiting') return <div className="replay-result dim">Sent, waiting for the recorded entry…</div>;
+
+  if (result.state === 'unsent') {
+    return (
+      <div className="replay-result">
+        <div className="title">Not sent</div>
+        <div className="dim">Couldn't read this request's earlier replays, so the new one couldn't be told apart. Try again.</div>
+        <div className="err">{result.error}</div>
+      </div>
+    );
+  }
 
   if (result.state === 'missing') {
     return (

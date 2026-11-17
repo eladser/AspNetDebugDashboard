@@ -88,6 +88,12 @@ function bodyReason(e: RequestEntry): string | null {
   return null;
 }
 
+// Request.Path is stored decoded (except %2F, which ASP.NET Core leaves escaped), so a
+// captured "/a%3Fb" comes back as "/a?b". Re-escape what would change meaning in a URL.
+export function encodePath(p: string): string {
+  return p.replace(/%(?!2[fF])|[?#\\]/g, (c) => encodeURIComponent(c));
+}
+
 export function buildDraft(e: RequestEntry, origin: string = window.location.origin): ReplayDraft {
   const headerText = Object.entries(e.headers ?? {})
     .filter(([name]) => name.toLowerCase() !== REPLAY_HEADER.toLowerCase())
@@ -96,7 +102,7 @@ export function buildDraft(e: RequestEntry, origin: string = window.location.ori
 
   const bodyDisabledReason = bodyReason(e);
   const body = bodyDisabledReason ? '' : e.requestBody ?? '';
-  const path = (e.path || '/') + (e.queryString ?? '');
+  const path = encodePath(e.path || '/') + (e.queryString ?? '');
 
   let captured: string | null = null;
   try {
