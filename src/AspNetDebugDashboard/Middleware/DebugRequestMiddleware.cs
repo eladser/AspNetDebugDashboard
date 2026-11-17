@@ -52,13 +52,20 @@ public class DebugRequestMiddleware
             if (_config.LogResponseBodies)
             {
                 var originalBodyStream = context.Response.Body;
-                using var responseBodyStream = new MemoryStream();
-                context.Response.Body = responseBodyStream;
+                var capture = new CaptureStream(originalBodyStream, context.Response);
+                context.Response.Body = capture;
 
-                await _next(context);
+                try
+                {
+                    await _next(context);
+                }
+                finally
+                {
+                    context.Response.Body = originalBodyStream;
+                }
 
                 stopwatch.Stop();
-                responseBody = await ReadResponseBodyAsync(context, responseBodyStream, originalBodyStream);
+                responseBody = await ReadResponseBodyAsync(capture, originalBodyStream);
             }
             else
             {
@@ -126,26 +133,63 @@ public class DebugRequestMiddleware
         }
     }
 
-    private async Task<string> ReadResponseBodyAsync(HttpContext context, MemoryStream responseBodyStream, Stream originalBodyStream)
+    private async Task<string> ReadResponseBodyAsync(CaptureStream capture, Stream originalBodyStream)
     {
+        var buffer = capture.Buffer;
+        string text;
         try
         {
-            if (responseBodyStream.Length > _config.MaxBodySize)
-                return $"[Body too large: {responseBodyStream.Length} bytes]";
-
-            responseBodyStream.Seek(0, SeekOrigin.Begin);
-            var responseBody = await new StreamReader(responseBodyStream).ReadToEndAsync();
-            
-            responseBodyStream.Seek(0, SeekOrigin.Begin);
-            await responseBodyStream.CopyToAsync(originalBodyStream);
-            context.Response.Body = originalBodyStream;
-
-            return responseBody;
+            text = buffer.Length > _config.MaxBodySize
+                ? $"[Body too large: {buffer.Length} bytes]"
+                : Encoding.UTF8.GetString(buffer.GetBuffer(), 0, (int)buffer.Length);
         }
         catch (Exception ex)
         {
-            return $"[Error reading response body: {ex.Message}]";
+            text = $"[Error reading response body: {ex.Message}]";
         }
+
+        // The client always gets the full response, whatever happened to the capture.
+        buffer.Position = 0;
+        await buffer.CopyToAsync(originalBodyStream);
+
+        return text;
+    }
+
+    // Buffers the response, except event streams: those have to reach the client as they're written.
+    private sealed class CaptureStream : Stream
+    {
+        private readonly Stream _original;
+        private readonly HttpResponse _response;
+        private Stream? _target;
+
+        public MemoryStream Buffer { get; } = new();
+
+        public CaptureStream(Stream original, HttpResponse response)
+        {
+            _original = original;
+            _response = response;
+        }
+
+        private Stream Target => _target ??=
+            _response.ContentType?.StartsWith("text/event-stream", StringComparison.OrdinalIgnoreCase) == true
+                ? _original
+                : Buffer;
+
+        public override bool CanRead => false;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+
+        public override void Flush() => Target.Flush();
+        public override Task FlushAsync(CancellationToken ct) => Target.FlushAsync(ct);
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => Target.Write(buffer, offset, count);
+        public override void Write(ReadOnlySpan<byte> buffer) => Target.Write(buffer);
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken ct) => Target.WriteAsync(buffer, offset, count, ct);
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken ct = default) => Target.WriteAsync(buffer, ct);
     }
 
     private async Task LogRequestAsync(HttpContext context, string requestId, string requestBody, string responseBody, long elapsedMs, Exception? exception = null)
