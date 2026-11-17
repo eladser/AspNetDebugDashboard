@@ -33,6 +33,7 @@ public class DebugFilter
     
     // Request filtering
     public string? RequestId { get; set; }
+    public string? ReplayOf { get; set; }
     public bool? HasRequestBody { get; set; }
     public bool? HasResponseBody { get; set; }
     

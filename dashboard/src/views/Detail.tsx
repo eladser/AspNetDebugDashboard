@@ -8,6 +8,7 @@ import { toCurl } from '../curl';
 import { JsonTree } from '../json';
 import { hasTimeline, nPlusOneGroups } from '../timeline';
 import { Timeline } from './Timeline';
+import { Replay } from './Replay';
 
 export type DetailRef =
   | { kind: 'request'; id: string }
@@ -433,10 +434,12 @@ export function DetailPanel({
 }) {
   const [entry, setEntry] = useState<RequestEntry | SqlQueryEntry | LogEntry | ExceptionEntry | DumpEntry | OutgoingHttpEntry | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [replayId, setReplayId] = useState<string | null>(null);
 
   useEffect(() => {
     setEntry(null);
     setError(null);
+    setReplayId(null);
     fetchers[refs.kind](refs.id)
       .then((e) => setEntry(e as typeof entry))
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
@@ -467,8 +470,16 @@ export function DetailPanel({
             <span>{fmtDateTime(r.timestamp)}</span>
           </>
         );
-        actions = <CopyButton text={toCurl(r)} label="copy as cURL" />;
-        body = <RequestDetail entry={r} onOpen={onOpen} />;
+        const replaying = replayId === r.id;
+        actions = (
+          <>
+            <CopyButton text={toCurl(r)} label="copy as cURL" />
+            <button className="copy-btn" onClick={() => setReplayId(replaying ? null : r.id)}>
+              {replaying ? 'back' : 'replay'}
+            </button>
+          </>
+        );
+        body = replaying ? <Replay entry={r} onOpen={onOpen} /> : <RequestDetail entry={r} onOpen={onOpen} />;
         break;
       }
       case 'query': {
