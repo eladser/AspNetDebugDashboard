@@ -1,4 +1,5 @@
 import type { RequestEntry, SqlQueryEntry } from './types';
+import { fmtDuration } from './format';
 
 export type Lane = 'sql' | 'http' | 'log' | 'dump' | 'exception';
 export type Interval = [number, number];
@@ -150,6 +151,21 @@ export function buildRows(r: RequestEntry): Row[] {
     rows.push({ id: 'exception', lane: 'exception', offset: total, dur: 0, label: t, title: t, warn: false });
   }
   return rows;
+}
+
+// fmtDuration shows anything under 1 ms as "<1 ms", so on a short request every tick
+// and every lane total would read the same
+export function fmtMs(ms: number): string {
+  return ms < 10 ? `${+ms.toFixed(2)} ms` : fmtDuration(ms);
+}
+
+// Labels go on the roomier side of their bar, or inside a long bar that leaves too
+// little room on either side (an outgoing call that takes most of the request).
+export function labelSide(left: number, width: number): 'left' | 'right' | 'in' {
+  const right = 100 - left - width;
+  const room = Math.max(left, right);
+  if (room < 20 && width > room) return 'in';
+  return left > right ? 'left' : 'right';
 }
 
 export function tickValues(total: number): number[] {

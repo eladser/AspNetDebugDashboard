@@ -1173,5 +1173,7 @@ pre.code {
 }
 
 .tl-row:hover .tl-label { color: var(--text); }
+.tl-label.in, .tl-row:hover .tl-label.in { color: var(--inset); }
 .tl-n { color: var(--warn); margin-right: 5px; font-weight: 700; }
+.tl-label.in .tl-n { color: inherit; }
 .tl-more { margin-top: 10px; }

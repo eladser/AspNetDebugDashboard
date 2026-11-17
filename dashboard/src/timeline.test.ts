@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { breakdown, buildRows, clampPct, hasTimeline, nPlusOneGroups, tickValues, unionMs } from './timeline';
+import { breakdown, buildRows, clampPct, fmtMs, hasTimeline, labelSide, nPlusOneGroups, tickValues, unionMs } from './timeline';
 import type { RequestEntry } from './types';
 
 let n = 0;
@@ -147,5 +147,28 @@ describe('tickValues', () => {
       expect(v[0]).toBe(0);
       expect(v[v.length - 1]).toBeLessThanOrEqual(t);
     }
+  });
+});
+
+describe('fmtMs', () => {
+  it('keeps sub-ms ticks apart', () => {
+    expect(tickValues(0.9).map(fmtMs)).toEqual(['0 ms', '0.2 ms', '0.4 ms', '0.6 ms', '0.8 ms']);
+    expect(fmtMs(1.5)).toBe('1.5 ms');
+  });
+  it('rounds like fmtDuration from 10 ms up', () => {
+    expect(fmtMs(314.4)).toBe('314 ms');
+    expect(fmtMs(2500)).toBe('2.50 s');
+  });
+});
+
+describe('labelSide', () => {
+  it('picks the roomier side', () => {
+    expect(labelSide(2, 1)).toBe('right');
+    expect(labelSide(80, 5)).toBe('left');
+    expect(labelSide(0, 60)).toBe('right');
+  });
+  it('goes inside a bar that fills nearly the whole axis', () => {
+    expect(labelSide(3, 97)).toBe('in');
+    expect(labelSide(10, 80)).toBe('in');
   });
 });

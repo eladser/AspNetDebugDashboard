@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { RequestEntry } from '../types';
-import { fmtDuration } from '../format';
-import { breakdown, buildRows, clampPct, tickValues, totalOf, type Lane } from '../timeline';
+import { breakdown, buildRows, clampPct, fmtMs, labelSide, tickValues, totalOf, type Lane } from '../timeline';
 import type { DetailRef } from './Detail';
 
 const LIMIT = 300;
@@ -27,9 +26,9 @@ export function Timeline({ entry, onOpen }: { entry: RequestEntry; onOpen: (ref:
   }
 
   const parts: string[] = [];
-  if (entry.sqlQueries?.length) parts.push(`SQL ${fmtDuration(b.sqlMs)}`);
-  if (entry.outgoingHttp?.length) parts.push(`HTTP ${fmtDuration(b.httpMs)}`);
-  parts.push(`app ${fmtDuration(b.appMs)} of ${fmtDuration(b.totalMs)}`);
+  if (entry.sqlQueries?.length) parts.push(`SQL ${fmtMs(b.sqlMs)}`);
+  if (entry.outgoingHttp?.length) parts.push(`HTTP ${fmtMs(b.httpMs)}`);
+  parts.push(`app ${fmtMs(b.appMs)} of ${fmtMs(b.totalMs)}`);
 
   return (
     <div className="tl">
@@ -43,7 +42,7 @@ export function Timeline({ entry, onOpen }: { entry: RequestEntry; onOpen: (ref:
       <div className="tl-ruler">
         {ticks.map((t) => (
           <span key={t} className={`tl-tick${t === 0 ? ' first' : ''}`} style={{ left: `${(t * 100) / total}%` }}>
-            {t === 0 ? '0' : fmtDuration(t)}
+            {t === 0 ? '0' : fmtMs(t)}
           </span>
         ))}
       </div>
@@ -56,7 +55,7 @@ export function Timeline({ entry, onOpen }: { entry: RequestEntry; onOpen: (ref:
         {shown.map((r) => {
           const { left, width } = clampPct(r.offset, r.dur, total);
           const after = left + width;
-          const flip = left > 100 - after;
+          const side = labelSide(left, width);
           const lane = r.lane;
           const open = lane === 'exception' ? undefined : () => onOpen({ kind: kinds[lane], id: r.id });
           return (
@@ -72,10 +71,12 @@ export function Timeline({ entry, onOpen }: { entry: RequestEntry; onOpen: (ref:
                   style={{ left: `${left}%`, width: `${width}%` }}
                 />
                 <span
-                  className="tl-label"
-                  style={flip
-                    ? { right: `${100 - left}%`, maxWidth: `${left}%`, paddingRight: 6 }
-                    : { left: `${after}%`, maxWidth: `${100 - after}%`, paddingLeft: 6 }}
+                  className={`tl-label${side === 'in' ? ' in' : ''}`}
+                  style={side === 'in'
+                    ? { left: `${left}%`, maxWidth: `${width}%`, paddingLeft: 6, paddingRight: 6 }
+                    : side === 'left'
+                      ? { right: `${100 - left}%`, maxWidth: `${left}%`, paddingRight: 6 }
+                      : { left: `${after}%`, maxWidth: `${100 - after}%`, paddingLeft: 6 }}
                 >
                   {r.nPlusOne && <b className="tl-n">×{r.nPlusOne}</b>}
                   {r.label}

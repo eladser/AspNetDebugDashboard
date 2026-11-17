@@ -6,7 +6,7 @@ import { CodeBlock, CopyButton, LevelTag, MethodTag, StatusCode } from '../ui';
 import { highlightSql } from '../sql';
 import { toCurl } from '../curl';
 import { JsonTree } from '../json';
-import { hasTimeline, nPlusOneGroups } from '../timeline';
+import { hasTimeline, nPlusOneGroups, totalOf } from '../timeline';
 import { Timeline } from './Timeline';
 import { Replay } from './Replay';
 
@@ -104,7 +104,7 @@ function RequestDetail({ entry, onOpen }: { entry: RequestEntry; onOpen: (ref: D
             <KV
               rows={[
                 ['Status', <StatusCode code={entry.statusCode} />],
-                ['Duration', fmtDuration(entry.executionTimeMs)],
+                ['Duration', fmtDuration(totalOf(entry))],
                 ['SQL time', queries.length > 0 ? `${fmtDuration(sqlTotal)} across ${queries.length} queries` : null],
                 ['Time', fmtDateTime(entry.timestamp)],
                 ['URL', entry.url],
@@ -466,7 +466,7 @@ export function DetailPanel({
         meta = (
           <>
             <StatusCode code={r.statusCode} />
-            <span>{fmtDuration(r.executionTimeMs)}</span>
+            <span>{fmtDuration(totalOf(r))}</span>
             <span>{fmtDateTime(r.timestamp)}</span>
           </>
         );
