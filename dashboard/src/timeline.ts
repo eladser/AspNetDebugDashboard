@@ -159,12 +159,11 @@ export function fmtMs(ms: number): string {
   return ms < 10 ? `${+ms.toFixed(2)} ms` : fmtDuration(ms);
 }
 
-// Labels go on the roomier side of their bar, or inside a long bar that leaves too
-// little room on either side (an outgoing call that takes most of the request).
+// Labels go on the roomier side of their bar, or inside a bar that's wider than the
+// space on either side (an outgoing call that takes most of the request).
 export function labelSide(left: number, width: number): 'left' | 'right' | 'in' {
   const right = 100 - left - width;
-  const room = Math.max(left, right);
-  if (room < 20 && width > room) return 'in';
+  if (width > Math.max(left, right)) return 'in';
   return left > right ? 'left' : 'right';
 }
 

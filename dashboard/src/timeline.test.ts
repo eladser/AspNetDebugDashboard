@@ -165,10 +165,12 @@ describe('labelSide', () => {
   it('picks the roomier side', () => {
     expect(labelSide(2, 1)).toBe('right');
     expect(labelSide(80, 5)).toBe('left');
-    expect(labelSide(0, 60)).toBe('right');
+    expect(labelSide(0, 40)).toBe('right');
+    expect(labelSide(30, 35)).toBe('right');
   });
-  it('goes inside a bar that fills nearly the whole axis', () => {
+  it('goes inside a bar wider than the space on either side', () => {
     expect(labelSide(3, 97)).toBe('in');
-    expect(labelSide(10, 80)).toBe('in');
+    expect(labelSide(23, 77)).toBe('in');
+    expect(labelSide(0, 60)).toBe('in');
   });
 });
