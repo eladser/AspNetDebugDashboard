@@ -54,6 +54,7 @@ public class LiteDbStorage : IDebugStorage
         _requests.EnsureIndex(x => x.StatusCode);
         _requests.EnsureIndex(x => x.Method);
         _requests.EnsureIndex(x => x.Path);
+        _requests.EnsureIndex(x => x.RequestId);
         
         _sqlQueries.EnsureIndex(x => x.Timestamp);
         _sqlQueries.EnsureIndex(x => x.RequestId);
