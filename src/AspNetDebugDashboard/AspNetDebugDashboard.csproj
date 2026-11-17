@@ -6,9 +6,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <PackageId>AspNetDebugDashboard</PackageId>
     <Title>ASP.NET Debug Dashboard</Title>
-    <Version>2.4.0</Version>
-    <AssemblyVersion>2.4.0</AssemblyVersion>
-    <FileVersion>2.4.0</FileVersion>
+    <Version>2.5.0</Version>
+    <AssemblyVersion>2.5.0</AssemblyVersion>
+    <FileVersion>2.5.0</FileVersion>
     <Authors>Elad Sertshuk</Authors>
     <Description>Request, SQL query, log, and exception capture for ASP.NET Core, viewable in a dashboard served at /_debug. Inspired by Laravel Telescope. LiteDB storage, EF Core interceptor, zero-config setup.</Description>
     <PackageProjectUrl>https://github.com/eladser/AspNetDebugDashboard</PackageProjectUrl>
@@ -18,7 +18,7 @@
     <PackageTags>aspnetcore;debugging;dashboard;telescope;logging;monitoring;efcore;middleware;developer-tools</PackageTags>
     <RepositoryUrl>https://github.com/eladser/AspNetDebugDashboard</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageReleaseNotes>2.4.0 adds a net11.0 target, outgoing HttpClient capture (on by default, bodies opt-in via CaptureOutgoingHttpBodies), DebugDump.Dump(value) for snapshotting objects at the call site, and live updates over server-sent events instead of polling (EnableRealTimeUpdates, on by default). RetentionPeriod, CleanupInterval and MaxDatabaseSize are enforced now, the static DebugLogger works, and a request whose handler threw is recorded as 500 instead of 200. Custom IDebugStorage implementations need the new members listed in docs/API.md. Full list in the changelog: https://github.com/eladser/AspNetDebugDashboard/blob/main/CHANGELOG.md</PackageReleaseNotes>
+    <PackageReleaseNotes>2.5.0 adds a Timeline tab to request detail, which puts a request's SQL queries, outgoing calls, logs and dumps on one time axis and marks repeated (N+1) queries, and a Replay button that resends a captured request, edited or not, and compares it with the original. Entries carry StartOffsetMs and DurationMs, requests carry ReplayOf, and GET /api/requests takes a replayOf filter. SQL queries are attached to their request right away and stored in the background, so the dashboard's own write no longer adds to the request's time and late queries from synchronous EF calls aren't dropped. With LogResponseBodies on, a request that throws no longer breaks the developer exception page, responses over MaxBodySize go out in full, and text/event-stream responses aren't buffered. No new options. Custom IDebugStorage implementations should apply DebugFilter.ReplayOf in GetRequestsAsync. Full list in the changelog: https://github.com/eladser/AspNetDebugDashboard/blob/main/CHANGELOG.md</PackageReleaseNotes>
     <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest</AnalysisLevel>
