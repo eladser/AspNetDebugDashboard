@@ -27,6 +27,7 @@ public static class DebugDump
         entry.File = file;
         entry.Line = line;
         entry.Member = member;
+        entry.StartOffsetMs = sink.Context.OffsetMs(scope);
 
         if (scope is not null)
         {

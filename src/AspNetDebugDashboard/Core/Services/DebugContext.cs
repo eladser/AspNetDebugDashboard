@@ -1,9 +1,14 @@
 using AspNetDebugDashboard.Core.Models;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 
 namespace AspNetDebugDashboard.Core.Services;
 
-public record RequestScope(string RequestId, string? TraceId);
+public record RequestScope(string RequestId, string? TraceId)
+{
+    // Stopwatch.GetTimestamp() at request start, 0 when unknown
+    public long StartTimestamp { get; init; }
+}
 
 public class DebugContext
 {
@@ -26,6 +31,18 @@ public class DebugContext
         _requestDumps.TryAdd(requestId, new List<DumpEntry>());
     }
     
+    // Ms since the request started; null when there's no live request to measure from.
+    public double? OffsetMs(RequestScope? scope) => OffsetMs(scope, Stopwatch.GetTimestamp());
+
+    internal double? OffsetMs(RequestScope? scope, long timestamp)
+    {
+        if (scope is null || scope.StartTimestamp == 0) return null;
+        if (GetActiveRequest(scope.RequestId) is null) return null;
+        return RoundMs(Stopwatch.GetElapsedTime(scope.StartTimestamp, timestamp).TotalMilliseconds);
+    }
+
+    internal static double RoundMs(double ms) => Math.Round(ms, 2);
+
     public RequestEntry? GetActiveRequest(string requestId)
     {
         _activeRequests.TryGetValue(requestId, out var request);

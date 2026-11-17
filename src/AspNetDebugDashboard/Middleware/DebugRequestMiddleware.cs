@@ -30,15 +30,16 @@ public class DebugRequestMiddleware
             return;
         }
 
-        var stopwatch = Stopwatch.StartNew();
+        var start = Stopwatch.GetTimestamp();
         var requestId = context.TraceIdentifier;
         var requestBody = "";
         var responseBody = "";
+        var elapsed = TimeSpan.Zero;
 
         // Register the request so the EF interceptor and IDebugLogger can
         // attach queries/logs to it while it's in flight.
         _debugContext.StartRequest(requestId, new RequestEntry { RequestId = requestId });
-        DebugContext.Current.Value = new RequestScope(requestId, Activity.Current?.TraceId.ToHexString());
+        DebugContext.Current.Value = new RequestScope(requestId, Activity.Current?.TraceId.ToHexString()) { StartTimestamp = start };
 
         try
         {
@@ -64,22 +65,22 @@ public class DebugRequestMiddleware
                     context.Response.Body = originalBodyStream;
                 }
 
-                stopwatch.Stop();
+                elapsed = Stopwatch.GetElapsedTime(start);
                 responseBody = await ReadResponseBodyAsync(capture, originalBodyStream);
             }
             else
             {
                 await _next(context);
-                stopwatch.Stop();
+                elapsed = Stopwatch.GetElapsedTime(start);
             }
 
             // Log the request
-            await LogRequestAsync(context, requestId, requestBody, responseBody, stopwatch.ElapsedMilliseconds);
+            await LogRequestAsync(context, requestId, requestBody, responseBody, elapsed);
         }
         catch (Exception ex)
         {
-            stopwatch.Stop();
-            await LogRequestAsync(context, requestId, requestBody, responseBody, stopwatch.ElapsedMilliseconds, ex);
+            elapsed = Stopwatch.GetElapsedTime(start);
+            await LogRequestAsync(context, requestId, requestBody, responseBody, elapsed, ex);
             throw;
         }
         finally
@@ -192,7 +193,7 @@ public class DebugRequestMiddleware
         public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken ct = default) => Target.WriteAsync(buffer, ct);
     }
 
-    private async Task LogRequestAsync(HttpContext context, string requestId, string requestBody, string responseBody, long elapsedMs, Exception? exception = null)
+    private async Task LogRequestAsync(HttpContext context, string requestId, string requestBody, string responseBody, TimeSpan elapsed, Exception? exception = null)
     {
         try
         {
@@ -231,7 +232,8 @@ public class DebugRequestMiddleware
                 RequestBody = requestBody,
                 ResponseBody = responseBody,
                 StatusCode = statusCode,
-                ExecutionTimeMs = elapsedMs,
+                ExecutionTimeMs = (long)elapsed.TotalMilliseconds,
+                DurationMs = DebugContext.RoundMs(elapsed.TotalMilliseconds),
                 Timestamp = DateTime.UtcNow,
                 UserAgent = request.Headers.UserAgent.ToString(),
                 IPAddress = GetClientIpAddress(context),
