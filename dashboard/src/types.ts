@@ -9,6 +9,7 @@ interface EntryBase {
   userId?: string | null;
   sessionId?: string | null;
   metadata: Record<string, unknown>;
+  startOffsetMs?: number | null;
 }
 
 export interface RequestEntry extends EntryBase {
@@ -18,6 +19,7 @@ export interface RequestEntry extends EntryBase {
   queryString: string;
   statusCode: number;
   executionTimeMs: number;
+  durationMs?: number | null;
   headers: Record<string, string>;
   requestBody?: string | null;
   responseBody?: string | null;
@@ -40,6 +42,7 @@ export interface SqlQueryEntry extends EntryBase {
   query: string;
   parameters: Record<string, unknown>;
   executionTimeMs: number;
+  durationMs?: number | null;
   rowsAffected: number;
   database?: string | null;
   isSuccessful: boolean;
@@ -67,6 +70,7 @@ export interface OutgoingHttpEntry extends EntryBase {
   host: string;
   statusCode?: number | null;
   executionTimeMs: number;
+  durationMs?: number | null;
   requestHeaders: Record<string, string>;
   responseHeaders: Record<string, string>;
   requestBody?: string | null;
