@@ -17,6 +17,9 @@ env:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
@@ -71,10 +74,16 @@ jobs:
             dotnet pack "$proj" -c Release --no-build -o artifacts
           done
 
+      # trusted publishing: trades the job's OIDC token for a one-hour key (policy on nuget.org, owner eladser1)
+      - uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+        id: nuget
+        with:
+          user: eladser1
+
       - name: Push
         run: |
           dotnet nuget push artifacts/*.nupkg \
-            --api-key ${{ secrets.NUGET_API_KEY }} \
+            --api-key ${{ steps.nuget.outputs.NUGET_API_KEY }} \
             --source https://api.nuget.org/v3/index.json \
             --skip-duplicate
 
