@@ -13,7 +13,6 @@ No new options and no setup changes. Entries stored by earlier versions load as 
 - `DurationMs` on requests, SQL queries, and outgoing calls, with sub-millisecond precision. `ExecutionTimeMs` stays as it was.
 - `ReplayOf` on requests, set from the `X-Debug-Replay-Of` header the replay sends. Only a GUID is accepted, and the header isn't stored with the other headers. `GET /api/requests?replayOf=<id>` returns the replays of one entry.
 - MCP `get_request` returns the new fields, and its description tells the agent they show where the request spent its time.
-- Sample app: `GET /api/orders/report` runs one query per order and a 300 ms outgoing call; `?batched=true` is the fixed version.
 
 ### Changed
 - SQL queries are attached to their request as soon as EF Core reports them and written to storage in the background. The dashboard's own database write no longer adds to the request's time (async EF calls used to wait for it).
@@ -22,8 +21,9 @@ No new options and no setup changes. Entries stored by earlier versions load as 
 
 ### Fixed
 - With `LogResponseBodies` on, a request that threw broke the developer exception page, because the response body still pointed at the dashboard's disposed buffer.
-- With `LogResponseBodies` on, responses over `MaxBodySize` went out empty. They go out in full now; only the captured copy is skipped.
+- With `LogResponseBodies` on, responses over `MaxBodySize` went out empty. They go out in full now, and past `MaxBodySize` the rest is passed straight to the client instead of being held in memory.
 - With `LogResponseBodies` on, `text/event-stream` responses were held until the handler finished. They're passed straight through and not captured.
+- With `LogResponseBodies` on, binary responses (images, `application/octet-stream`) were stored as garbled text. They're stored as `[Binary body: N bytes, <type>]`.
 - Queries from synchronous EF calls (`ToList()`, `SaveChanges()`) near the end of a request could be missing from it, since they were only attached after the storage write.
 
 ## [2.4.0] - 2026-11-10
