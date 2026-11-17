@@ -33,6 +33,7 @@ builder.Services.AddDebugDashboard(config =>
     config.LogExceptions = true;
     config.MaxEntries = 1000;
     config.CaptureOutgoingHttpBodies = true;
+    config.ExcludedPaths.Add("/internal/"); // the slow stand-in behind GET /api/orders/report
 });
 
 // SQLite so the EF interceptor has real SQL to capture

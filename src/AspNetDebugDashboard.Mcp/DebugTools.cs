@@ -27,7 +27,7 @@ public static class DebugTools
     }
 
     [McpServerTool(Name = "get_request")]
-    [Description("Full detail for one request by id, including its captured body, headers, the SQL queries it ran, and the logs it wrote.")]
+    [Description("Full detail for one request by id, including its captured body, headers, the SQL queries it ran, its outgoing HTTP calls, and the logs and dumps it wrote. Each SQL query, outgoing call, log, and dump has startOffsetMs (ms since the request started) and queries and calls also have durationMs, so you can see where the request spent its time.")]
     public static Task<string> GetRequest(
         DashboardClient client,
         [Description("The request id.")] string id,

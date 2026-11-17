@@ -238,6 +238,14 @@ describe('compareRows', () => {
     expect(rows[3]).toMatchObject({ delta: '+1', tone: 'worse' });
   });
 
+  it('uses durationMs when an entry has it, executionTimeMs otherwise', () => {
+    const rows = compareRows(entry({ executionTimeMs: 9, durationMs: 9.9 }), entry({ executionTimeMs: 2, durationMs: 2.1 }));
+    expect(rows[1]).toMatchObject({ before: 9.9, after: 2.1, delta: '-8 ms', tone: 'better' });
+
+    const old = compareRows(entry({ executionTimeMs: 400 }), entry({ executionTimeMs: 60, durationMs: 60.4 }));
+    expect(old[1]).toMatchObject({ before: 400, after: 60.4, delta: '-340 ms' });
+  });
+
   it('treats tiny duration changes as noise', () => {
     const rows = compareRows(entry({ executionTimeMs: 40 }), entry({ executionTimeMs: 43 }));
     expect(rows[1].tone).toBe('same');

@@ -2,6 +2,30 @@
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versions follow [SemVer](https://semver.org).
 
+## [2.5.0] - 2026-11-XX
+
+No new options and no setup changes. Entries stored by earlier versions load as they are; they have no timing offsets, so their detail opens on Summary.
+
+### Added
+- Timeline tab in request detail, first and selected by default. It puts the request's SQL queries, outgoing HTTP calls, logs, and dumps on one time axis, with SQL, HTTP, and app time totaled above it. A query that runs three or more times in the request is highlighted and counted, slow queries are flagged, and an unhandled exception is marked at the end. Hover shows the SQL, URL, or message; click opens the entry. Requests with more than 300 entries show the first 300 and a "show all" link. The tab is hidden when nothing in the request has an offset.
+- Replay, next to copy-as-cURL in request detail. It resends a captured request from the browser to the dashboard's origin with its method, path, headers, and body prefilled and editable, then shows the original and the replay side by side (status, duration, SQL queries, outgoing calls) with the differences colored, and opens the replay on its timeline. Redacted values (`***`), dropped headers, and bodies that can't be resent are called out before sending. Replays are marked in the request list and link to the original. Limits are in [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#replay-doesnt-match-the-original-request).
+- `StartOffsetMs` on SQL queries, outgoing calls, logs, and dumps: ms from the start of the request, rounded to 0.01. Null for anything not captured while its request was in flight.
+- `DurationMs` on requests, SQL queries, and outgoing calls, with sub-millisecond precision. `ExecutionTimeMs` stays as it was.
+- `ReplayOf` on requests, set from the `X-Debug-Replay-Of` header the replay sends. Only a GUID is accepted, and the header isn't stored with the other headers. `GET /api/requests?replayOf=<id>` returns the replays of one entry.
+- MCP `get_request` returns the new fields, and its description tells the agent they show where the request spent its time.
+- Sample app: `GET /api/orders/report` runs one query per order and a 300 ms outgoing call; `?batched=true` is the fixed version.
+
+### Changed
+- SQL queries are attached to their request as soon as EF Core reports them and written to storage in the background. The dashboard's own database write no longer adds to the request's time (async EF calls used to wait for it).
+- `DebugFilter` has a `ReplayOf` property. Custom `IDebugStorage` implementations should apply it in `GetRequestsAsync`; the replay panel uses it to find the replayed request.
+- Requests are indexed on `RequestId`, so following a query, log, call, or dump to its request doesn't scan the collection.
+
+### Fixed
+- With `LogResponseBodies` on, a request that threw broke the developer exception page, because the response body still pointed at the dashboard's disposed buffer.
+- With `LogResponseBodies` on, responses over `MaxBodySize` went out empty. They go out in full now; only the captured copy is skipped.
+- With `LogResponseBodies` on, `text/event-stream` responses were held until the handler finished. They're passed straight through and not captured.
+- Queries from synchronous EF calls (`ToList()`, `SaveChanges()`) near the end of a request could be missing from it, since they were only attached after the storage write.
+
 ## [2.4.0] - 2026-11-10
 
 Existing setup is unchanged unless you implement `IDebugStorage` yourself (see Changed). Outgoing HTTP capture and live updates are on by default (still only in allowed environments). Outgoing request and response bodies stay off until you opt in.

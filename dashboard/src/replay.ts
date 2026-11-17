@@ -180,9 +180,10 @@ export function compareRows(before: RequestEntry, after: RequestEntry): CompareR
       ? 'worse'
       : !ok(before.statusCode) && ok(after.statusCode) ? 'better' : 'changed';
 
-  const ms = after.executionTimeMs - before.executionTimeMs;
+  const dur = (e: RequestEntry) => e.durationMs ?? e.executionTimeMs;
+  const ms = dur(after) - dur(before);
   // a few ms either way is noise, not a change
-  const noise = Math.max(5, before.executionTimeMs * 0.1);
+  const noise = Math.max(5, dur(before) * 0.1);
 
   return [
     {
@@ -194,8 +195,8 @@ export function compareRows(before: RequestEntry, after: RequestEntry): CompareR
     },
     {
       label: 'Duration',
-      before: before.executionTimeMs,
-      after: after.executionTimeMs,
+      before: dur(before),
+      after: dur(after),
       delta: ms === 0 ? '0 ms' : `${ms > 0 ? '+' : '-'}${fmtDuration(Math.abs(ms))}`,
       tone: Math.abs(ms) < noise ? 'same' : ms < 0 ? 'better' : 'worse',
     },
