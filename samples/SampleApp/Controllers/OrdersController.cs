@@ -1,5 +1,7 @@
 using AspNetDebugDashboard;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using SampleApp.Data;
 using SampleApp.Models;
 using SampleApp.Services;
 
@@ -10,6 +12,7 @@ namespace SampleApp.Controllers;
 public class OrdersController : ControllerBase
 {
     private readonly IOrderService _orderService;
+    private static ShippingRates? _rates;
 
     public OrdersController(IOrderService orderService)
     {
@@ -29,6 +32,46 @@ public class OrdersController : ControllerBase
             await DebugLogger.ErrorAsync($"Error fetching orders: {ex.Message}", "OrdersController");
             return StatusCode(500, "Internal server error");
         }
+    }
+
+    // Slow on purpose, for trying the Timeline and Replay. It loads the items with one query
+    // per order (N+1), then waits on a 300 ms shipping-rates call. Replay it with
+    // ?batched=true for the fixed version: one query for all the items, and the rates
+    // come from the previous call instead of a new one.
+    [HttpGet("report")]
+    public async Task<IActionResult> Report(
+        [FromServices] SampleDbContext db, [FromServices] IHttpClientFactory http, bool batched = false)
+    {
+        var recent = db.Orders.OrderByDescending(o => o.Id).Take(20);
+        List<Order> orders;
+        if (batched)
+        {
+            orders = await recent.Include(o => o.OrderItems).ToListAsync();
+        }
+        else
+        {
+            orders = await recent.ToListAsync();
+            foreach (var o in orders)
+                o.OrderItems = await db.OrderItems.Where(i => i.OrderId == o.Id).ToListAsync();
+        }
+
+        if (!batched || _rates == null)
+            _rates = await http.CreateClient().GetFromJsonAsync<ShippingRates>($"{Request.Scheme}://{Request.Host}/internal/shipping-rates");
+
+        return Ok(new
+        {
+            shipping = _rates,
+            orders = orders.Select(o => new { o.Id, o.Status, items = o.OrderItems.Count, total = o.OrderItems.Sum(i => i.Quantity * i.UnitPrice) })
+        });
+    }
+
+    // Stands in for a slow upstream service. /internal/ is in ExcludedPaths (Program.cs),
+    // so this shows up as the report's outgoing call, not as a request of its own.
+    [HttpGet("/internal/shipping-rates")]
+    public async Task<ShippingRates> Rates()
+    {
+        await Task.Delay(300);
+        return new ShippingRates(4.99m, 14.99m);
     }
 
     [HttpGet("{id}")]

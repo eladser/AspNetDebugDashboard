@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using SampleApp.Models;
 
 namespace SampleApp.Data;
@@ -8,9 +9,14 @@ public static class SeedData
     {
         await context.Database.EnsureCreatedAsync();
 
-        if (context.Products.Any())
-            return;
+        if (!context.Products.Any())
+            await SeedCatalogAsync(context);
 
+        await TopUpOrdersAsync(context);
+    }
+
+    private static async Task SeedCatalogAsync(SampleDbContext context)
+    {
         var products = new List<Product>
         {
             new Product { Name = "Laptop", Description = "High-performance laptop", Price = 999.99m, Stock = 10 },
@@ -60,6 +66,31 @@ public static class SeedData
         }
 
         context.Orders.AddRange(orders);
+        await context.SaveChangesAsync();
+    }
+
+    // GET /api/orders/report runs one query per order, so give it enough orders to show up
+    private static async Task TopUpOrdersAsync(SampleDbContext context)
+    {
+        const int target = 18;
+        var count = await context.Orders.CountAsync();
+        if (count >= target)
+            return;
+
+        var products = await context.Products.ToListAsync();
+        var customers = await context.Customers.ToListAsync();
+        for (var i = count; i < target; i++)
+        {
+            var p = products[i % products.Count];
+            var qty = 1 + i % 3;
+            context.Orders.Add(new Order
+            {
+                CustomerId = customers[i % customers.Count].Id,
+                Status = i % 4 == 0 ? "Pending" : "Completed",
+                TotalAmount = qty * p.Price,
+                OrderItems = { new OrderItem { ProductId = p.Id, Quantity = qty, UnitPrice = p.Price } }
+            });
+        }
         await context.SaveChangesAsync();
     }
 }

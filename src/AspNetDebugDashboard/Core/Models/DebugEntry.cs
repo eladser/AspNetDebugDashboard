@@ -8,6 +8,7 @@ public abstract class DebugEntry
     public string RequestId { get; set; } = string.Empty;
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
     public string Type { get; set; } = string.Empty;
+    public double? StartOffsetMs { get; set; }
     public string? CorrelationId { get; set; }
     public string? UserId { get; set; }
     public string? SessionId { get; set; }
@@ -22,6 +23,7 @@ public class RequestEntry : DebugEntry
     public string QueryString { get; set; } = string.Empty;
     public int StatusCode { get; set; }
     public long ExecutionTimeMs { get; set; }
+    public double? DurationMs { get; set; }
     public Dictionary<string, string> Headers { get; set; } = new();
     public string? RequestBody { get; set; }
     public string? ResponseBody { get; set; }
@@ -38,6 +40,7 @@ public class RequestEntry : DebugEntry
     public long ResponseSize { get; set; }
     public string? Protocol { get; set; }
     public bool IsHttps { get; set; }
+    public string? ReplayOf { get; set; }
 }
 
 public class SqlQueryEntry : DebugEntry
@@ -45,6 +48,7 @@ public class SqlQueryEntry : DebugEntry
     public string Query { get; set; } = string.Empty;
     public Dictionary<string, object> Parameters { get; set; } = new();
     public long ExecutionTimeMs { get; set; }
+    public double? DurationMs { get; set; }
     public int RowsAffected { get; set; }
     public string? ConnectionString { get; set; }
     public string? Database { get; set; }
@@ -97,6 +101,7 @@ public class OutgoingHttpEntry : DebugEntry
     public string Host { get; set; } = string.Empty;
     public int? StatusCode { get; set; }
     public long ExecutionTimeMs { get; set; }
+    public double? DurationMs { get; set; }
     public Dictionary<string, string> RequestHeaders { get; set; } = new();
     public Dictionary<string, string> ResponseHeaders { get; set; } = new();
     public string? RequestBody { get; set; }

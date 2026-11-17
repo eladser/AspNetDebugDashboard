@@ -1,3 +1,9 @@
+using AspNetDebugDashboard;
+using AspNetDebugDashboard.Core.Services;
+using AspNetDebugDashboard.Interceptors;
+using AspNetDebugDashboard.Tests;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using AspNetDebugDashboard.Extensions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
@@ -91,6 +97,88 @@ app.MapGet("/test-outgoing", async context =>
         context.Response.StatusCode = 502;
         await context.Response.WriteAsync(ex.Message);
     }
+});
+
+// Timeline capture: each endpoint runs a fixed sequence of work against in-memory SQLite.
+static (SqliteConnection, WidgetContext) NewDb(HttpContext ctx)
+{
+    var conn = new SqliteConnection("DataSource=:memory:");
+    conn.Open();
+    var opts = new DbContextOptionsBuilder<WidgetContext>()
+        .UseSqlite(conn)
+        .AddInterceptors(ctx.RequestServices.GetRequiredService<DebugCommandInterceptor>())
+        .Options;
+    return (conn, new WidgetContext(opts));
+}
+
+app.MapGet("/test-timeline", async context =>
+{
+    var (conn, db) = NewDb(context);
+    using (conn)
+    await using (db)
+    {
+        await db.Database.EnsureCreatedAsync();
+        db.Widgets.Add(new Widget { Name = "a" });
+        await db.SaveChangesAsync();
+        await db.Widgets.ToListAsync();
+    }
+
+    using var client = new HttpClient();
+    await client.GetAsync(context.Request.Query["url"].ToString());
+
+    await context.RequestServices.GetRequiredService<IDebugLogger>().LogInfoAsync("timeline log");
+    DebugDump.Dump(new { step = 4 }, "timeline dump");
+
+    await context.Response.WriteAsync("ok");
+});
+
+app.MapGet("/test-timeline-sync", async context =>
+{
+    var (conn, db) = NewDb(context);
+    using (conn)
+    using (db)
+    {
+        db.Database.EnsureCreated();
+        db.Widgets.Add(new Widget { Name = "a" });
+        db.SaveChanges();
+        db.Widgets.ToList();
+        db.Widgets.ToList();
+        db.Widgets.Count();
+    }
+    await context.Response.WriteAsync("ok");
+});
+
+app.MapGet("/test-timeline-slow", async context =>
+{
+    var (conn, db) = NewDb(context);
+    using (conn)
+    await using (db)
+    {
+        conn.CreateFunction("nap", (long ms) => { Thread.Sleep((int)ms); return 1L; });
+        await db.Database.ExecuteSqlRawAsync("select 1");
+        await db.Database.ExecuteSqlRawAsync("select nap(250)");
+    }
+    await context.Response.WriteAsync("ok");
+});
+
+app.MapGet("/test-timeline-fail", async context =>
+{
+    var (conn, db) = NewDb(context);
+    using (conn)
+    await using (db)
+    {
+        try { db.Database.ExecuteSqlRaw("select * from nope"); } catch { }
+        try { await db.Database.ExecuteSqlRawAsync("select * from nope"); } catch { }
+    }
+    await context.Response.WriteAsync("ok");
+});
+
+app.MapGet("/test-timeline-parallel", async context =>
+{
+    var url = context.Request.Query["url"].ToString();
+    using var client = new HttpClient();
+    await Task.WhenAll(client.GetAsync(url), client.GetAsync(url));
+    await context.Response.WriteAsync("ok");
 });
 
 app.MapControllers();

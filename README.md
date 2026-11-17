@@ -14,6 +14,24 @@ Everything is stored locally in a LiteDB file. The dashboard ships inside the pa
 
 ![Demo](https://raw.githubusercontent.com/eladser/AspNetDebugDashboard/main/docs/images/demo.gif)
 
+## Timeline
+
+Open a request and the first tab shows where its time went. Every SQL query, outgoing HTTP call, log, and dump sits on one time axis, ordered by when it started, under a line like `SQL 41 ms · HTTP 120 ms · app 18 ms of 160 ms`. A query that runs three or more times in the request is highlighted and counted (`×18`), so an N+1 is hard to miss. Slow queries are flagged, and an unhandled exception is marked at the end of the request. Hover a bar for the SQL text, URL, or message; click it to open the entry.
+
+![Timeline](https://raw.githubusercontent.com/eladser/AspNetDebugDashboard/main/docs/images/timeline.png)
+
+There's nothing to set up: offsets are recorded for anything captured while the request is in flight. SQL bars cover the command itself, up to when EF Core gets the data reader back, not the time spent reading rows. Outgoing calls end when the response headers arrive. Requests captured before 2.5 have no offsets and open on Summary.
+
+### Replay
+
+The **Replay** button next to copy-as-cURL sends the request again from the dashboard, with the method, path, headers, and body filled in from the capture. Edit any of them, send, and the panel puts the original and the replay side by side: status, duration, SQL queries, and outgoing calls, with the differences colored. From there you can open the replay on its own timeline. Replays are marked in the request list and link back to the original.
+
+![Replay](https://raw.githubusercontent.com/eladser/AspNetDebugDashboard/main/docs/images/replay.png)
+
+Redacted values (`***`) and headers that were never captured (`Authorization` and the rest of `ExcludedHeaders`) have to be filled in by hand before sending. The panel says when that applies; the full list of limits is in [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#replay-doesnt-match-the-original-request).
+
+The sample app's `GET /api/orders/report` is set up for trying both: it runs one query per order and waits on a 300 ms outgoing call. Replay it with `?batched=true` to see the fixed version.
+
 ## The suite
 
 The dashboard is the hub of a set of local-first dev tools that follow the same recipe: install a package, get a self-contained page at a `/_*` route, no extra infrastructure. Each works on its own, and when more than one is installed they share a sidebar so you can move between them.
@@ -39,7 +57,7 @@ dotnet add package AspNetDebugDashboard
 Or in the project file:
 
 ```xml
-<PackageReference Include="AspNetDebugDashboard" Version="2.4.0" />
+<PackageReference Include="AspNetDebugDashboard" Version="2.5.0" />
 ```
 
 Or from the Package Manager Console in Visual Studio:
@@ -135,7 +153,8 @@ Bodies are off by default. Turn them on with `CaptureOutgoingHttpBodies = true` 
 |---|---|
 | **Overview** | totals, error rate, status/method distribution, slowest requests and queries |
 | **Performance** | req/min, avg, median, P95/P99, error rate, slowest endpoints (last hour) |
-| **Requests** | sortable table with duration bars; detail has Summary / Headers / Request / Response / SQL / HTTP / Logs / Dumps tabs and a **copy-as-cURL** button |
+| **Requests** | sortable table with duration bars; detail has Timeline / Summary / Headers / Request / Response / SQL / HTTP / Logs / Dumps tabs, a **copy-as-cURL** button, and **Replay** to resend the request (edited or not) and compare the two |
+| **Timeline** | first tab in request detail: SQL, outgoing HTTP, logs, and dumps on one time axis, with SQL / HTTP / app time and repeated queries marked |
 | **Queries** | full SQL with syntax highlighting, parameters, timing; slow queries flagged; an **N+1 warning** appears when one request runs the same query 3+ times |
 | **Outgoing** | HTTP calls your app made: method, URL, status, timing, request and response headers, bodies if enabled; failed-only and host filters |
 | **Logs** | level, category, structured properties, stack traces |
@@ -166,9 +185,9 @@ builder.Services.AddDebugDashboard(options =>
     options.LogResponseBodies = false;
     options.MaxBodySize = 1024 * 1024;         // bodies above this are skipped
     options.SlowQueryThresholdMs = 1000;
-    options.ExcludedPaths = new() { "/_debug", "/health" };
+    options.ExcludedPaths = new() { "/_debug", "/favicon.ico", "/robots.txt" };
     options.ExcludedHeaders = new() { "Authorization", "Cookie", "Set-Cookie", "X-Api-Key", "X-Auth-Token", "Proxy-Authorization" };
-    options.RedactedBodyFields = new() { "password", "secret", "token", "apikey" }; // matched case-insensitively against JSON and form field names
+    options.RedactedBodyFields = new() { "password", "secret", "token", "apikey" }; // case-insensitive substring match on JSON and form field names
     options.AllowedEnvironments = new() { "Development" }; // "*" allows every environment
     options.AuthorizationFilter = null;        // Func<HttpContext, bool>, applied to UI + API
     options.RetentionPeriod = TimeSpan.FromDays(7);
@@ -272,7 +291,7 @@ The dashboard is a client of a plain JSON API you can also call directly:
 | Endpoint | What it returns |
 |---|---|
 | `GET /_debug/api/stats` | totals and distributions |
-| `GET /_debug/api/requests` | paged requests; supports `search`, `method`, `statusCode`, `isSuccessful`, `minExecutionTime`, `sortBy`, `page` |
+| `GET /_debug/api/requests` | paged requests; supports `search`, `method`, `statusCode`, `isSuccessful`, `minExecutionTime`, `replayOf`, `sortBy`, `page` |
 | `GET /_debug/api/queries` | paged SQL queries; supports `search`, `isSlowQuery`, `isSuccessful` |
 | `GET /_debug/api/logs` | paged logs; supports `search`, `level` |
 | `GET /_debug/api/exceptions` | paged exceptions |
@@ -300,9 +319,10 @@ curl http://localhost:5000/api/products
 curl http://localhost:5000/api/products/slow-operation
 curl http://localhost:5000/api/products/test-error
 curl http://localhost:5000/api/externalapi/zen     # outgoing call to api.github.com
+curl http://localhost:5000/api/orders/report       # N+1 queries and a slow outgoing call
 ```
 
-`POST /api/orders` calls `DebugDump.Dump` on the order it creates. The demo gif above is recorded against this app by [docs/capture-demo.mjs](docs/capture-demo.mjs).
+`POST /api/orders` calls `DebugDump.Dump` on the order it creates. `GET /api/orders/report` loads each order's items with a separate query and then calls a local endpoint that takes 300 ms; open it on the Timeline, then replay it with `?batched=true` for the version that loads the items in one query and reuses the last result of that call. The sample adds about 4 ms to every SQL command ([LatencyInterceptor](samples/SampleApp/Data/LatencyInterceptor.cs)) so SQLite, which runs in-process, behaves like a database server over the network; that time comes from the sample, not the dashboard. The demo gif above is recorded against this app by [docs/capture-demo.mjs](docs/capture-demo.mjs).
 
 ## How the dashboard is built
 

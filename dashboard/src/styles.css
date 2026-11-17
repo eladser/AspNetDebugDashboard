@@ -988,6 +988,92 @@ pre.code {
 
 .link-btn:hover { text-decoration: underline; }
 
+/* replay */
+.replay-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.replay-path { flex: 1; width: auto; font-family: var(--mono); }
+
+.replay-send { color: var(--accent); border-color: rgba(65, 200, 173, 0.35); white-space: nowrap; }
+.replay-send:hover { color: var(--accent); border-color: var(--accent); }
+.replay-send:disabled { opacity: 0.4; cursor: default; }
+
+.replay-text {
+  display: block;
+  width: 100%;
+  margin-bottom: 16px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--inset);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  resize: vertical;
+  outline: none;
+}
+
+.replay-text:focus { border-color: var(--accent); }
+.replay-text:disabled { color: var(--faint); cursor: not-allowed; }
+.replay-text::placeholder { color: var(--faint); }
+
+.replay-notes {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.replay-notes .warn { color: var(--warn); }
+.replay-notes .err { color: var(--err); }
+
+.replay-result {
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  font-size: 12px;
+}
+
+.replay-result .title { color: var(--text); font-weight: 600; margin-bottom: 3px; }
+.replay-result .err { color: var(--err); font-family: var(--mono); margin-top: 4px; }
+
+.replay-compare {
+  display: grid;
+  grid-template-columns: 110px 1fr 1fr 1fr;
+  gap: 4px 12px;
+  font-family: var(--mono);
+  margin-bottom: 8px;
+}
+
+.delta.better { color: var(--ok); }
+.delta.worse { color: var(--err); }
+.delta.changed { color: var(--warn); }
+.delta.same { color: var(--faint); }
+
+.replay-mark {
+  margin-left: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--accent);
+  background: var(--accent-dim);
+  border: 0;
+  border-radius: 4px;
+  padding: 0 5px;
+  cursor: pointer;
+  vertical-align: 1px;
+}
+
+.replay-mark:hover { text-decoration: underline; }
+
 /* perf endpoint table reuse */
 .bar-cell { display: flex; align-items: center; gap: 8px; }
 .bar-cell .track {
@@ -1009,3 +1095,85 @@ pre.code {
     scroll-behavior: auto !important;
   }
 }
+
+.tl-sum {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.tl-par {
+  margin-left: 8px;
+  color: var(--warn);
+  font-size: 11px;
+  cursor: help;
+}
+
+.tl-ruler {
+  position: relative;
+  height: 18px;
+  margin-right: 28px;
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.tl-tick {
+  position: absolute;
+  bottom: 3px;
+  transform: translateX(-50%);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.tl-tick.first { transform: none; }
+
+.tl-rows {
+  position: relative;
+  margin-right: 28px;
+  padding: 4px 0;
+}
+
+.tl-grid { position: absolute; inset: 0; pointer-events: none; }
+.tl-grid span { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--border); }
+
+.tl-row { position: relative; height: 22px; display: flex; align-items: center; }
+.tl-row.clickable { cursor: pointer; }
+.tl-row:hover { background: rgba(255, 255, 255, 0.03); }
+
+.tl-track { position: relative; width: 100%; height: 12px; }
+
+.tl-bar {
+  position: absolute;
+  top: 0;
+  height: 12px;
+  min-width: 2px;
+  border-radius: 2px;
+  background: var(--info);
+}
+
+.tl-bar.http { background: var(--accent); }
+.tl-bar.log { background: var(--faint); }
+.tl-bar.dump { background: var(--ok); }
+.tl-bar.exception { background: var(--err); }
+.tl-bar.sql.warn { background: var(--warn); }
+.tl-bar.tick { top: -2px; height: 16px; }
+
+.tl-label {
+  position: absolute;
+  top: -2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--muted);
+}
+
+.tl-row:hover .tl-label { color: var(--text); }
+.tl-label.in, .tl-row:hover .tl-label.in { color: var(--inset); }
+.tl-n { color: var(--warn); margin-right: 5px; font-weight: 700; }
+.tl-label.in .tl-n { color: inherit; }
+.tl-more { margin-top: 10px; }

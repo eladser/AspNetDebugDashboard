@@ -30,15 +30,16 @@ public class DebugRequestMiddleware
             return;
         }
 
-        var stopwatch = Stopwatch.StartNew();
+        var start = Stopwatch.GetTimestamp();
         var requestId = context.TraceIdentifier;
         var requestBody = "";
         var responseBody = "";
+        var elapsed = TimeSpan.Zero;
 
         // Register the request so the EF interceptor and IDebugLogger can
         // attach queries/logs to it while it's in flight.
         _debugContext.StartRequest(requestId, new RequestEntry { RequestId = requestId });
-        DebugContext.Current.Value = new RequestScope(requestId, Activity.Current?.TraceId.ToHexString());
+        DebugContext.Current.Value = new RequestScope(requestId, Activity.Current?.TraceId.ToHexString()) { StartTimestamp = start };
 
         try
         {
@@ -52,7 +53,7 @@ public class DebugRequestMiddleware
             if (_config.LogResponseBodies)
             {
                 var originalBodyStream = context.Response.Body;
-                var capture = new CaptureStream(originalBodyStream, context.Response);
+                var capture = new CaptureStream(originalBodyStream, context.Response, _config.MaxBodySize);
                 context.Response.Body = capture;
 
                 try
@@ -64,22 +65,22 @@ public class DebugRequestMiddleware
                     context.Response.Body = originalBodyStream;
                 }
 
-                stopwatch.Stop();
-                responseBody = await ReadResponseBodyAsync(capture, originalBodyStream);
+                elapsed = Stopwatch.GetElapsedTime(start);
+                responseBody = await ReadResponseBodyAsync(capture, originalBodyStream, context.Response.ContentType);
             }
             else
             {
                 await _next(context);
-                stopwatch.Stop();
+                elapsed = Stopwatch.GetElapsedTime(start);
             }
 
             // Log the request
-            await LogRequestAsync(context, requestId, requestBody, responseBody, stopwatch.ElapsedMilliseconds);
+            await LogRequestAsync(context, requestId, requestBody, responseBody, elapsed);
         }
         catch (Exception ex)
         {
-            stopwatch.Stop();
-            await LogRequestAsync(context, requestId, requestBody, responseBody, stopwatch.ElapsedMilliseconds, ex);
+            elapsed = Stopwatch.GetElapsedTime(start);
+            await LogRequestAsync(context, requestId, requestBody, responseBody, elapsed, ex);
             throw;
         }
         finally
@@ -133,15 +134,18 @@ public class DebugRequestMiddleware
         }
     }
 
-    private async Task<string> ReadResponseBodyAsync(CaptureStream capture, Stream originalBodyStream)
+    private async Task<string> ReadResponseBodyAsync(CaptureStream capture, Stream originalBodyStream, string? contentType)
     {
+        if (capture.Streaming) return "";
+        if (capture.Overflowed) return $"[Body too large: {capture.Total} bytes]";
+
         var buffer = capture.Buffer;
         string text;
         try
         {
-            text = buffer.Length > _config.MaxBodySize
-                ? $"[Body too large: {buffer.Length} bytes]"
-                : Encoding.UTF8.GetString(buffer.GetBuffer(), 0, (int)buffer.Length);
+            text = IsTextual(contentType)
+                ? Encoding.UTF8.GetString(buffer.GetBuffer(), 0, (int)buffer.Length)
+                : $"[Binary body: {buffer.Length} bytes, {contentType!.Split(';')[0].Trim()}]";
         }
         catch (Exception ex)
         {
@@ -155,25 +159,61 @@ public class DebugRequestMiddleware
         return text;
     }
 
-    // Buffers the response, except event streams: those have to reach the client as they're written.
+    private static bool IsTextual(string? contentType)
+    {
+        if (string.IsNullOrWhiteSpace(contentType)) return true;
+
+        var type = contentType.Split(';')[0].Trim().ToLowerInvariant();
+        return type.StartsWith("text/")
+            || type is "application/json" or "application/xml" or "application/javascript" or "application/x-www-form-urlencoded"
+            || type.StartsWith("application/") && (type.EndsWith("+json") || type.EndsWith("+xml"));
+    }
+
+    // Buffers the response up to MaxBodySize. Past that, and for event streams, writes go
+    // straight to the client so big downloads and live streams aren't held in memory.
     private sealed class CaptureStream : Stream
     {
         private readonly Stream _original;
         private readonly HttpResponse _response;
-        private Stream? _target;
+        private readonly int _max;
+        private bool? _streaming;
 
         public MemoryStream Buffer { get; } = new();
+        public bool Overflowed { get; private set; }
+        public long Total { get; private set; }
+        public bool Streaming => _streaming == true;
 
-        public CaptureStream(Stream original, HttpResponse response)
+        public CaptureStream(Stream original, HttpResponse response, int max)
         {
             _original = original;
             _response = response;
+            _max = max;
         }
 
-        private Stream Target => _target ??=
-            _response.ContentType?.StartsWith("text/event-stream", StringComparison.OrdinalIgnoreCase) == true
-                ? _original
-                : Buffer;
+        private bool Direct
+        {
+            get
+            {
+                _streaming ??= _response.ContentType?.StartsWith("text/event-stream", StringComparison.OrdinalIgnoreCase) == true;
+                return _streaming == true || Overflowed;
+            }
+        }
+
+        private bool WouldOverflow(int count) => !Direct && Buffer.Length + count > _max;
+
+        private void Spill()
+        {
+            Overflowed = true;
+            _original.Write(Buffer.GetBuffer(), 0, (int)Buffer.Length);
+            Buffer.SetLength(0);
+        }
+
+        private async Task SpillAsync(CancellationToken ct)
+        {
+            Overflowed = true;
+            await _original.WriteAsync(Buffer.GetBuffer().AsMemory(0, (int)Buffer.Length), ct);
+            Buffer.SetLength(0);
+        }
 
         public override bool CanRead => false;
         public override bool CanSeek => false;
@@ -181,18 +221,35 @@ public class DebugRequestMiddleware
         public override long Length => throw new NotSupportedException();
         public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
 
-        public override void Flush() => Target.Flush();
-        public override Task FlushAsync(CancellationToken ct) => Target.FlushAsync(ct);
+        public override void Flush() { if (Direct) _original.Flush(); }
+        public override Task FlushAsync(CancellationToken ct) => Direct ? _original.FlushAsync(ct) : Task.CompletedTask;
         public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
         public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
         public override void SetLength(long value) => throw new NotSupportedException();
-        public override void Write(byte[] buffer, int offset, int count) => Target.Write(buffer, offset, count);
-        public override void Write(ReadOnlySpan<byte> buffer) => Target.Write(buffer);
-        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken ct) => Target.WriteAsync(buffer, offset, count, ct);
-        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken ct = default) => Target.WriteAsync(buffer, ct);
+
+        public override void Write(byte[] buffer, int offset, int count) => Write(buffer.AsSpan(offset, count));
+
+        public override void Write(ReadOnlySpan<byte> buffer)
+        {
+            Total += buffer.Length;
+            if (WouldOverflow(buffer.Length)) Spill();
+            if (Direct) _original.Write(buffer);
+            else Buffer.Write(buffer);
+        }
+
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken ct) =>
+            WriteAsync(buffer.AsMemory(offset, count), ct).AsTask();
+
+        public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken ct = default)
+        {
+            Total += buffer.Length;
+            if (WouldOverflow(buffer.Length)) await SpillAsync(ct);
+            if (Direct) await _original.WriteAsync(buffer, ct);
+            else await Buffer.WriteAsync(buffer, ct);
+        }
     }
 
-    private async Task LogRequestAsync(HttpContext context, string requestId, string requestBody, string responseBody, long elapsedMs, Exception? exception = null)
+    private async Task LogRequestAsync(HttpContext context, string requestId, string requestBody, string responseBody, TimeSpan elapsed, Exception? exception = null)
     {
         try
         {
@@ -200,7 +257,7 @@ public class DebugRequestMiddleware
             
             foreach (var header in context.Request.Headers)
             {
-                if (!_config.ExcludedHeaders.Contains(header.Key, StringComparer.OrdinalIgnoreCase))
+                if (!_config.ExcludedHeaders.Contains(header.Key, StringComparer.OrdinalIgnoreCase) && !ReplayMarker.IsHeader(header.Key))
                 {
                     headers[header.Key] = string.Join(", ", header.Value.ToArray());
                 }
@@ -227,11 +284,13 @@ public class DebugRequestMiddleware
                 Url = $"{request.Scheme}://{request.Host}{request.Path}{request.QueryString}",
                 Protocol = request.Protocol,
                 IsHttps = request.IsHttps,
+                ReplayOf = ReplayMarker.Read(request),
                 Headers = headers,
                 RequestBody = requestBody,
                 ResponseBody = responseBody,
                 StatusCode = statusCode,
-                ExecutionTimeMs = elapsedMs,
+                ExecutionTimeMs = (long)elapsed.TotalMilliseconds,
+                DurationMs = DebugContext.RoundMs(elapsed.TotalMilliseconds),
                 Timestamp = DateTime.UtcNow,
                 UserAgent = request.Headers.UserAgent.ToString(),
                 IPAddress = GetClientIpAddress(context),

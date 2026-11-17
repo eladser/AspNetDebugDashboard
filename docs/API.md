@@ -83,6 +83,7 @@ Returns a paginated list of HTTP requests.
 - `isSuccessful` (bool): `false` returns only 4xx/5xx, `true` only sub-400
 - `minExecutionTime` (int): Only requests at or above this duration in ms
 - `requestId` (string): Exact match on the trace identifier
+- `replayOf` (string): Only replays of this request entry, matched exactly against its `id` (see [Replay](#replay))
 - `dateFrom` / `dateTo` (datetime): Time range
 - `sortBy` (string): `timestamp`, `executiontimems`, `statuscode`, `method`, `path` (default: `timestamp`)
 - `sortDescending` (bool): Sort direction (default: true)
@@ -100,6 +101,7 @@ Returns a paginated list of HTTP requests.
       "queryString": "?page=1&size=10",
       "statusCode": 200,
       "executionTimeMs": 125,
+      "durationMs": 125.43,
       "headers": {
         "User-Agent": "Mozilla/5.0...",
         "Accept": "application/json"
@@ -114,7 +116,8 @@ Returns a paginated list of HTTP requests.
       "logs": [],
       "outgoingHttp": [],
       "dumps": [],
-      "exception": null
+      "exception": null,
+      "replayOf": null
     }
   ],
   "totalCount": 150,
@@ -141,6 +144,7 @@ Returns a specific request by ID.
   "queryString": "?page=1&size=10",
   "statusCode": 200,
   "executionTimeMs": 125,
+  "durationMs": 125.43,
   "headers": {
     "User-Agent": "Mozilla/5.0...",
     "Accept": "application/json"
@@ -156,6 +160,8 @@ Returns a specific request by ID.
       "id": "sql-456",
       "query": "SELECT * FROM Products",
       "executionTimeMs": 25,
+      "durationMs": 25.31,
+      "startOffsetMs": 41.2,
       "parameters": {},
       "isSuccessful": true
     }
@@ -165,12 +171,45 @@ Returns a specific request by ID.
       "id": "log-789",
       "level": "Info",
       "message": "Fetching products",
-      "tag": "ProductService"
+      "tag": "ProductService",
+      "startOffsetMs": 3.05
     }
   ],
-  "exception": null
+  "exception": null,
+  "replayOf": null
 }
 ```
+
+The SQL queries, outgoing calls, logs, and dumps in the response carry their timeline fields, described next.
+
+## Timeline fields
+
+Added in 2.5. They're all nullable, so entries stored by earlier versions load unchanged and just have nulls.
+
+| Field | On | What it is |
+|---|---|---|
+| `startOffsetMs` | SQL queries, outgoing calls, logs, dumps | ms from the start of the request to the start of the entry, rounded to 0.01 |
+| `durationMs` | requests, SQL queries, outgoing calls | how long it took in ms, rounded to 0.01. `executionTimeMs` is still there, as whole ms |
+| `replayOf` | requests | `id` of the request entry this one replays, from the `X-Debug-Replay-Of` header |
+
+`startOffsetMs` is null on requests and exceptions, on anything captured before 2.5, and on anything that wasn't recorded while its request was in flight (an unattached outgoing call, a dump taken after the request finished). For SQL it's when the command started, and `durationMs` runs until EF Core got the data reader back, so reading the rows isn't included. For outgoing calls `durationMs` runs until the response headers arrived. Logs and dumps are points in time and have no duration. The stored values aren't clamped to the request; the dashboard clamps them when it draws the timeline.
+
+The standalone endpoints (`/api/queries`, `/api/http-requests`, `/api/logs`, `/api/dumps`) return the same fields.
+
+## Replay
+
+### `X-Debug-Replay-Of` request header
+
+The dashboard's Replay button sends this header with the `id` of the request entry it replays. If the value parses as a GUID, the middleware stores it on the new entry as `replayOf` (in the standard lowercase form); anything else is ignored. The header is left out of the stored `headers`, so replaying a replay doesn't send it twice.
+
+Nothing about it is specific to the dashboard, so other tools can tag requests the same way:
+
+```bash
+curl -H "X-Debug-Replay-Of: 6c824a01-4774-4a07-b5dd-2a3c4fe7e3cb" "http://localhost:5000/api/orders/report?batched=true"
+curl "http://localhost:5000/_debug/api/requests?replayOf=6c824a01-4774-4a07-b5dd-2a3c4fe7e3cb"
+```
+
+The second call returns every request replayed from that entry, newest first. Custom `IDebugStorage` implementations need to apply `DebugFilter.ReplayOf` in `GetRequestsAsync` for this filter, and the replay panel, to work.
 
 ## SQL Queries API
 
@@ -201,6 +240,8 @@ Returns a paginated list of SQL queries.
         "@p0": true
       },
       "executionTimeMs": 25,
+      "durationMs": 25.31,
+      "startOffsetMs": 41.2,
       "rowsAffected": 0,
       "requestId": "req-123",
       "database": "SampleDb",
@@ -257,6 +298,7 @@ Returns a paginated list of log entries.
         "Action": "GetProducts"
       },
       "stackTrace": null,
+      "startOffsetMs": 3.05,
       "timestamp": "2025-01-07T10:30:00Z"
     }
   ],
@@ -372,6 +414,8 @@ Returns a paginated list of outgoing HTTP calls, newest first by default.
       "host": "api.github.com",
       "statusCode": 200,
       "executionTimeMs": 78,
+      "durationMs": 78.64,
+      "startOffsetMs": 12.4,
       "requestHeaders": { "User-Agent": "AspNetDebugDashboard-SampleApp" },
       "responseHeaders": { "Content-Type": "text/plain;charset=utf-8" },
       "requestBody": null,
@@ -426,6 +470,7 @@ Returns a paginated list of `DebugDump.Dump()` snapshots.
       "line": 59,
       "member": "Create",
       "requestId": "0HNOUKQ37MI6B:00000001",
+      "startOffsetMs": 18.7,
       "timestamp": "2026-09-30T06:54:28Z"
     }
   ],

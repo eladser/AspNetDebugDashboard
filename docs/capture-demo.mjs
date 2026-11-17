@@ -30,7 +30,8 @@ const CHROME = process.env.CHROME ?? (process.platform === 'win32'
 const PORT = 9333;
 const W = 1440, H = 900;          // screenshot size
 const GIF_W = 960, GIF_FPS = 18;  // gif is scaled down from the same frames
-const SPEED = 1.3;                 // playback speed-up, keeps the gif near 30s
+const SPEED = 1.2;                 // playback speed-up, keeps the gif near 30s
+const REPORT = '/api/orders/report'; // the sample's N+1 endpoint, replayed with ?batched=true
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const tmp = mkdtempSync(join(tmpdir(), 'debug-demo-'));
@@ -147,23 +148,50 @@ async function clickOn(sel, text, { pause = 250, ms } = {}) {
   await click();
 }
 
+const rect = (sel) => js(`(() => {
+  const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect();
+  return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+})()`);
+
 async function press(key, code, keyCode) {
   await cdp('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode: keyCode });
   await cdp('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: keyCode });
 }
 const esc = () => press('Escape', 'Escape', 27);
 
+async function type(text, ms = 110) {
+  for (const ch of text) {
+    await cdp('Input.insertText', { text: ch });
+    await sleep(ms);
+  }
+}
+
+// Frames that arrive while a screenshot hides the cursor are dropped, so the gif holds
+// the frame before instead of blinking the cursor off.
+let hold = false;
+
 async function screenshot(name) {
+  hold = true;
   await js(`document.getElementById('__cursor')?.style.setProperty('visibility', 'hidden')`);
   const { data } = await cdp('Page.captureScreenshot', { format: 'png' });
   writeFileSync(join(OUT, name), Buffer.from(data, 'base64'));
   await js(`document.getElementById('__cursor')?.style.removeProperty('visibility')`);
+  await sleep(150);
+  hold = false;
   console.log(`wrote ${name}`);
 }
 
 // --- traffic --------------------------------------------------------------
 
-const hit = (path, init) => fetch(BASE + path, init).then((r) => r.text()).catch((e) => console.warn(path, e.message));
+// Headers a browser would send, so request detail and the replay panel don't say "User-Agent: node".
+const BROWSER = {
+  'Accept': 'application/json',
+  'Accept-Encoding': 'gzip, deflate, br, zstd',
+  'Accept-Language': 'en-US,en;q=0.5',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:144.0) Gecko/20100101 Firefox/144.0',
+};
+const hit = (path, init = {}) => fetch(BASE + path, { ...init, headers: { ...BROWSER, ...init.headers } })
+  .then((r) => r.text()).catch((e) => console.warn(path, e.message));
 const order = (items) => hit('/api/orders', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
@@ -179,7 +207,7 @@ async function traffic() {
   await sleep(1100);
   await hit('/api/products/999');
   await sleep(1100);
-  await hit('/api/products/search?q=key');
+  await hit(REPORT);
 }
 
 // --- run ------------------------------------------------------------------
@@ -191,92 +219,98 @@ try {
   await cdp('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: 1, mobile: false });
   await cdp('Page.addScriptToEvaluateOnNewDocument', { source: CURSOR });
 
-  // Start from an empty store with a little history so the lists aren't bare.
+  // Warm up both report variants so neither shows EF's first-query cost, then start
+  // from an empty store with a little history so the lists aren't bare.
+  await hit(REPORT);
+  await hit(`${REPORT}?batched=true`);
   await hit('/_debug/api/clear', { method: 'DELETE' });
-  for (const p of ['/api/products', '/api/products/1', '/api/orders', '/api/products/4',
-    '/api/orders/customer/1', '/api/products/slow-operation', '/api/products', '/api/orders/2']) await hit(p);
+  for (const p of ['/api/products', '/api/products/1', REPORT, '/api/orders', '/api/products/4',
+    '/api/orders/customer/1', '/api/products/slow-operation', '/api/products/search?q=key', REPORT,
+    '/api/orders/2']) await hit(p);
 
   await cdp('Page.navigate', { url: `${BASE}/_debug` });
   await find('.nav-item', 'Requests');
-  await sleep(800);
+  await sleep(1200);
 
   // Frames carry their capture time, which becomes each frame's duration in the gif.
   const frames = [];
   handlers.set('Page.screencastFrame', ({ data, metadata, sessionId }) => {
+    if (hold) return cdp('Page.screencastFrameAck', { sessionId }).catch(() => {});
     const file = join(framesDir, `f${String(frames.length).padStart(5, '0')}.jpg`);
     writeFileSync(file, Buffer.from(data, 'base64'));
     frames.push({ file, t: metadata.timestamp });
     cdp('Page.screencastFrameAck', { sessionId }).catch(() => {});
   });
   await cdp('Page.startScreencast', { format: 'jpeg', quality: 92, maxWidth: W, maxHeight: H, everyNthFrame: 1 });
-  await moveTo(W * 0.5, H * 0.5, 200);
-  await sleep(600);
+  await moveTo(W * 0.5, H * 0.82, 200);
+  await sleep(1600);
 
-  // Requests: new rows arrive over the live stream while we watch.
+  // Requests: new rows arrive over the live stream while we watch, the report last.
   await clickOn('.nav-item', 'Requests');
   await sleep(700);
   await traffic();
-  await sleep(1100);
+  await sleep(1300);
+
+  // The report on its timeline: one query per order, then the 300 ms outgoing call.
+  await clickOn('tbody tr', REPORT);
+  await find('.tl-row');
+  let r = await rect('.tl-rows');
+  await moveTo(r.left + (r.right - r.left) * 0.6, r.bottom + 60, 700);
+  await sleep(1500);
+  await screenshot('timeline.png');
+  await sleep(2500);
+
+  // Replay it with the fix switched on.
+  await clickOn('.detail-head .copy-btn', 'replay');
+  await sleep(900);
+  await clickOn('.replay-path', '');
+  await press('End', 'End', 35);
+  r = await rect('.replay-path');
+  await moveTo(r.right - 8, r.bottom + 28, 300); // clear of the text being typed and the notes
+  await type('?batched=true');
+  await sleep(600);
+  await clickOn('.replay-send', 'Send');
+  await find('.replay-compare');
+  r = await rect('.replay-result');
+  await moveTo(r.right - 40, r.bottom + 50, 500);
+  await sleep(900);
+  await screenshot('replay.png');
+  await sleep(2600);
+
+  // The replay on its own timeline, then back to the list where it's marked.
+  await clickOn('.replay-result .link-btn', 'open replay');
+  await find('.tl-row');
+  r = await rect('.tl-rows');
+  await moveTo(r.left + (r.right - r.left) * 0.6, r.bottom + 60, 600);
+  await sleep(2600);
+  await esc();
+  await sleep(2200);
+  await cdp('Page.stopScreencast');
+  console.log(`${frames.length} frames over ${(frames.at(-1).t - frames[0].t).toFixed(1)}s`);
+
+  // The rest are stills.
+  await moveTo(W * 0.6, H * 0.8, 50);
   await screenshot('requests.png');
 
-  // A request that called an external API: its HTTP tab.
-  await clickOn('tbody tr', '/api/externalapi/zen');
-  await sleep(900);
-  await clickOn('.dtab', 'HTTP');
-  await sleep(1100);
-  await esc();
-  await sleep(500);
-
-  // The order POST: dumps captured during the request.
-  await clickOn('tbody tr', 'POST');
-  await sleep(900);
-  await clickOn('.dtab', 'Dumps');
-  await sleep(1000);
-  await clickOn('.dtab', 'SQL');
+  await clickOn('tbody tr', 'POST', { ms: 50 });
+  await clickOn('.dtab', 'SQL', { ms: 50 });
   await sleep(800);
   await screenshot('request-detail.png');
   await esc();
-  await sleep(500);
+  await sleep(300);
 
-  // Outgoing tab and one call in detail.
-  await clickOn('.nav-item', 'Outgoing');
+  await clickOn('.nav-item', 'Queries', { ms: 50 });
   await sleep(700);
-  await clickOn('tbody tr', 'api.github.com');
-  await sleep(900);
-  await clickOn('.dtab', 'Response');
-  await sleep(1100);
-  await esc();
-  await sleep(400);
-
-  // Dumps tab with the JSON tree, collapse and reopen a branch.
-  await clickOn('.nav-item', 'Dumps');
-  await sleep(900);
-  await clickOn('tbody tr', 'created order');
-  await sleep(1100);
-  // expand the first order item (nested levels start collapsed)
-  const toggle = await find('.json-tree .jv-indent .jv-indent .jv-toggle', '');
-  await moveTo(toggle.x, toggle.y);
-  await sleep(200);
-  await click();
-  await sleep(900);
-  await esc();
-  await sleep(400);
-
-  // SQL
-  await clickOn('.nav-item', 'Queries');
-  await sleep(700);
-  await clickOn('tbody tr', 'INSERT');
-  await sleep(1500);
+  await clickOn('tbody tr', 'SELECT "o1"', { ms: 50 }); // the batched replay's one query
+  await sleep(1200);
   await screenshot('query-detail.png');
   await esc();
-  await sleep(400);
+  await sleep(300);
 
-  await cdp('Page.stopScreencast');
-  await clickOn('.nav-item', 'Overview');
+  await clickOn('.nav-item', 'Overview', { ms: 50 });
   await sleep(1300);
   await screenshot('overview.png');
   await sleep(300);
-  console.log(`${frames.length} frames over ${(frames.at(-1).t - frames[0].t).toFixed(1)}s`);
 
   // concat list: each frame shown until the next one arrived
   const lines = [];

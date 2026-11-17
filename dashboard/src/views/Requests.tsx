@@ -101,7 +101,18 @@ export function Requests({
                   onClick={() => { setSel(i); onOpen({ kind: 'request', id: r.id }); }}
                 >
                   <td className="fit"><MethodTag method={r.method} /></td>
-                  <td className="primary" title={r.url}>{r.path}{r.queryString}</td>
+                  <td className="primary" title={r.url}>
+                    {r.path}{r.queryString}
+                    {r.replayOf && (
+                      <button
+                        className="replay-mark"
+                        title="Replayed from the dashboard. Click to open the original"
+                        onClick={(e) => { e.stopPropagation(); onOpen({ kind: 'request', id: r.replayOf! }); }}
+                      >
+                        replay
+                      </button>
+                    )}
+                  </td>
                   <td className="fit"><StatusCode code={r.statusCode} /></td>
                   <td className="num fit">
                     <Duration ms={r.executionTimeMs} max={maxMs} slow={r.executionTimeMs >= slowRef.current} />

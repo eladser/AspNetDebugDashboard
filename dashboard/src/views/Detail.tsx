@@ -6,6 +6,9 @@ import { CodeBlock, CopyButton, LevelTag, MethodTag, StatusCode } from '../ui';
 import { highlightSql } from '../sql';
 import { toCurl } from '../curl';
 import { JsonTree } from '../json';
+import { hasTimeline, nPlusOneGroups, totalOf } from '../timeline';
+import { Timeline } from './Timeline';
+import { Replay } from './Replay';
 
 export type DetailRef =
   | { kind: 'request'; id: string }
@@ -67,30 +70,19 @@ function Tabs<T extends string>({
   );
 }
 
-// Duplicate-query grouping: parameterized SQL repeats verbatim when the same
-// statement runs in a loop, which is the classic N+1 shape.
-function findNPlusOne(queries: SqlQueryEntry[]): { query: string; count: number } | null {
-  const counts = new Map<string, number>();
-  for (const q of queries) counts.set(q.query, (counts.get(q.query) ?? 0) + 1);
-  let worst: { query: string; count: number } | null = null;
-  for (const [query, count] of counts) {
-    if (count >= 3 && (!worst || count > worst.count)) worst = { query, count };
-  }
-  return worst;
-}
-
-type ReqTab = 'summary' | 'headers' | 'request' | 'response' | 'sql' | 'http' | 'logs' | 'dumps';
+type ReqTab = 'timeline' | 'summary' | 'headers' | 'request' | 'response' | 'sql' | 'http' | 'logs' | 'dumps';
 
 function RequestDetail({ entry, onOpen }: { entry: RequestEntry; onOpen: (ref: DetailRef) => void }) {
-  const [tab, setTab] = useState<ReqTab>('summary');
+  const [tab, setTab] = useState<ReqTab>(hasTimeline(entry) ? 'timeline' : 'summary');
   const queries = entry.sqlQueries ?? [];
   const logs = entry.logs ?? [];
   const dumps = entry.dumps ?? [];
   const outgoing = entry.outgoingHttp ?? [];
-  const nPlusOne = useMemo(() => findNPlusOne(queries), [queries]);
+  const nPlusOne = useMemo(() => nPlusOneGroups(queries)[0] ?? null, [queries]);
   const sqlTotal = queries.reduce((s, q) => s + q.executionTimeMs, 0);
 
   const tabs: { id: ReqTab; label: string; n?: number }[] = [
+    ...(hasTimeline(entry) ? [{ id: 'timeline' as const, label: 'Timeline' }] : []),
     { id: 'summary', label: 'Summary' },
     { id: 'headers', label: 'Headers', n: Object.keys(entry.headers ?? {}).length },
     { id: 'request', label: 'Request' },
@@ -105,12 +97,14 @@ function RequestDetail({ entry, onOpen }: { entry: RequestEntry; onOpen: (ref: D
     <>
       <Tabs tabs={tabs} active={tab} onSelect={setTab} />
       <div className="detail-body">
+        {tab === 'timeline' && <Timeline entry={entry} onOpen={onOpen} />}
+
         {tab === 'summary' && (
           <>
             <KV
               rows={[
                 ['Status', <StatusCode code={entry.statusCode} />],
-                ['Duration', fmtDuration(entry.executionTimeMs)],
+                ['Duration', fmtDuration(totalOf(entry))],
                 ['SQL time', queries.length > 0 ? `${fmtDuration(sqlTotal)} across ${queries.length} queries` : null],
                 ['Time', fmtDateTime(entry.timestamp)],
                 ['URL', entry.url],
@@ -440,10 +434,12 @@ export function DetailPanel({
 }) {
   const [entry, setEntry] = useState<RequestEntry | SqlQueryEntry | LogEntry | ExceptionEntry | DumpEntry | OutgoingHttpEntry | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [replayId, setReplayId] = useState<string | null>(null);
 
   useEffect(() => {
     setEntry(null);
     setError(null);
+    setReplayId(null);
     fetchers[refs.kind](refs.id)
       .then((e) => setEntry(e as typeof entry))
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
@@ -470,12 +466,20 @@ export function DetailPanel({
         meta = (
           <>
             <StatusCode code={r.statusCode} />
-            <span>{fmtDuration(r.executionTimeMs)}</span>
+            <span>{fmtDuration(totalOf(r))}</span>
             <span>{fmtDateTime(r.timestamp)}</span>
           </>
         );
-        actions = <CopyButton text={toCurl(r)} label="copy as cURL" />;
-        body = <RequestDetail entry={r} onOpen={onOpen} />;
+        const replaying = replayId === r.id;
+        actions = (
+          <>
+            <CopyButton text={toCurl(r)} label="copy as cURL" />
+            <button className="copy-btn" onClick={() => setReplayId(replaying ? null : r.id)}>
+              {replaying ? 'back' : 'replay'}
+            </button>
+          </>
+        );
+        body = replaying ? <Replay entry={r} onOpen={onOpen} /> : <RequestDetail entry={r} onOpen={onOpen} />;
         break;
       }
       case 'query': {

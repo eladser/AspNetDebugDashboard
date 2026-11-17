@@ -55,6 +55,7 @@ public class LiteDbStorage : IDebugStorage
         _requests.EnsureIndex(x => x.Method);
         _requests.EnsureIndex(x => x.Path);
         _requests.EnsureIndex(x => x.RequestId);
+        _requests.EnsureIndex(x => x.ReplayOf);
         
         _sqlQueries.EnsureIndex(x => x.Timestamp);
         _sqlQueries.EnsureIndex(x => x.RequestId);
@@ -275,6 +276,9 @@ public class LiteDbStorage : IDebugStorage
 
             if (!string.IsNullOrEmpty(filter.RequestId))
                 query = query.Where(x => x.RequestId == filter.RequestId);
+
+            if (!string.IsNullOrEmpty(filter.ReplayOf))
+                query = query.Where(x => x.ReplayOf == filter.ReplayOf);
 
             // IsSuccessful=false means "failed only" (4xx/5xx)
             if (filter.IsSuccessful.HasValue)

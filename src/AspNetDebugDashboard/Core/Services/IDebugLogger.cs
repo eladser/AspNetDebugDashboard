@@ -36,6 +36,7 @@ public class DebugLogger : IDebugLogger
             Level = level,
             Tag = tag,
             RequestId = requestId ?? string.Empty,
+            StartOffsetMs = _debugContext.OffsetMs(DebugContext.Current.Value),
             Properties = properties ?? new Dictionary<string, object>()
         };
 

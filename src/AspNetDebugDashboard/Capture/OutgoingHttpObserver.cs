@@ -156,7 +156,7 @@ public sealed class OutgoingHttpObserver : IHostedService, IObserver<DiagnosticL
 
         var entry = state.Entry;
         entry.RequestId = requestId ?? "";
-        entry.ExecutionTimeMs = ElapsedMs(state.StartTimestamp);
+        Stamp(entry, state);
 
         var response = GetProp(payload, "Response") as HttpResponseMessage;
         if (response is not null)
@@ -207,7 +207,7 @@ public sealed class OutgoingHttpObserver : IHostedService, IObserver<DiagnosticL
 
         var entry = state.Entry;
         entry.RequestId = requestId ?? "";
-        entry.ExecutionTimeMs = ElapsedMs(state.StartTimestamp);
+        Stamp(entry, state);
         entry.Error = ex?.Message;
         entry.ExceptionType = ex?.GetType().Name;
 
@@ -288,8 +288,14 @@ public sealed class OutgoingHttpObserver : IHostedService, IObserver<DiagnosticL
         return System.Text.Encoding.UTF8.GetString(buffer, 0, maxBytes) + "\n...[truncated]";
     }
 
-    private static long ElapsedMs(long startTimestamp) =>
-        (long)Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds;
+    // Offset is only set while the owning request is still live (see DebugContext.OffsetMs)
+    private void Stamp(OutgoingHttpEntry entry, CallState state)
+    {
+        var elapsed = Stopwatch.GetElapsedTime(state.StartTimestamp);
+        entry.ExecutionTimeMs = (long)elapsed.TotalMilliseconds;
+        entry.DurationMs = DebugContext.RoundMs(elapsed.TotalMilliseconds);
+        entry.StartOffsetMs = _debugContext.OffsetMs(state.Scope, state.StartTimestamp);
+    }
 
     private static object? GetProp(object? payload, string name) =>
         payload?.GetType().GetProperty(name, BindingFlags.Public | BindingFlags.Instance)?.GetValue(payload);
