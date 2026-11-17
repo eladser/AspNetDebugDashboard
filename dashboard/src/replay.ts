@@ -116,19 +116,20 @@ export function buildDraft(e: RequestEntry, origin: string = window.location.ori
   };
 }
 
-// Replays always go to the dashboard's own origin: keep only path + query, even if a full
-// or protocol-relative URL was pasted in.
-export function replayPath(path: string): string {
-  const p = path.trim();
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(p) || p.startsWith('//')) {
-    try {
-      const u = new URL(p, 'http://x');
-      return u.pathname + u.search;
-    } catch {
-      return '/';
-    }
+// Absolute URL for the replay, or null when the path would leave the dashboard's origin.
+// Browsers read "\" as "/" and drop tabs and newlines, so "/\evil.com" or "/\n/evil.com"
+// would turn into "//evil.com"; reject those outright. The result is absolute on purpose:
+// a pathname alone can still start with "//" (from "/.//evil.com") and re-resolve elsewhere.
+export function replayUrl(path: string, origin: string = window.location.origin): string | null {
+  if (/[\\\u0000-\u001f\u007f]/.test(path)) return null;
+  let u: URL;
+  try {
+    u = new URL(path.trim(), origin);
+  } catch {
+    return null;
   }
-  return '/' + p.replace(/^\/+/, '');
+  if (u.origin !== origin) return null;
+  return u.origin + u.pathname + u.search;
 }
 
 export function sendsBody(method: string): boolean {

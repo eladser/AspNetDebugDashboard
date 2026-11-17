@@ -3,7 +3,7 @@ import { api } from '../api';
 import type { RequestEntry } from '../types';
 import { fmtDuration } from '../format';
 import { StatusCode } from '../ui';
-import { buildDraft, compareRows, countRedacted, parseHeaderLines, replayPath, sendsBody, toFetchInit } from '../replay';
+import { buildDraft, compareRows, countRedacted, parseHeaderLines, replayUrl, sendsBody, toFetchInit } from '../replay';
 import type { DetailRef } from './Detail';
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
@@ -40,8 +40,13 @@ export function Replay({ entry, onOpen }: { entry: RequestEntry; onOpen: (ref: D
   const noBody = !sendsBody(method) || !!draft.bodyDisabledReason;
   const busy = result?.state === 'sending' || result?.state === 'waiting';
   const methods = METHODS.includes(method) ? METHODS : [method, ...METHODS];
+  const target = replayUrl(path);
 
   const send = async () => {
+    // this exact string is what fetch gets, so checking it here covers the send
+    const url = replayUrl(path);
+    if (!url || new URL(url).origin !== window.location.origin) return;
+
     const id = ++run.current;
     const live = () => id === run.current;
     setResult({ state: 'sending' });
@@ -57,7 +62,7 @@ export function Replay({ entry, onOpen }: { entry: RequestEntry; onOpen: (ref: D
     let status = 0;
     let error: string | undefined;
     try {
-      const res = await fetch(replayPath(path), toFetchInit({ ...draft, method, path, headerText, body }, entry.id));
+      const res = await fetch(url, toFetchInit({ ...draft, method, path, headerText, body }, entry.id));
       status = res.status;
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -95,7 +100,7 @@ export function Replay({ entry, onOpen }: { entry: RequestEntry; onOpen: (ref: D
           onChange={(e) => setPath(e.target.value)}
           onKeyDown={stop}
         />
-        <button className="btn replay-send" onClick={send} disabled={busy || parsed.errors.length > 0}>
+        <button className="btn replay-send" onClick={send} disabled={busy || !target || parsed.errors.length > 0}>
           Send {method}
         </button>
       </div>
@@ -103,6 +108,7 @@ export function Replay({ entry, onOpen }: { entry: RequestEntry; onOpen: (ref: D
       {result && <ReplayResult result={result} original={entry} onOpen={onOpen} />}
 
       <ul className="replay-notes">
+        {!target && <li className="err">Path points outside this app.</li>}
         {parsed.errors.length > 0 && (
           <li className="err">Fix before sending: {parsed.errors.join('; ')}</li>
         )}

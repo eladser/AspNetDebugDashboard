@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildDraft, compareRows, countRedacted, parseHeaderLines, replayPath, toFetchInit, type ReplayDraft } from './replay';
+import { buildDraft, compareRows, countRedacted, parseHeaderLines, replayUrl, toFetchInit, type ReplayDraft } from './replay';
 import type { RequestEntry } from './types';
 
 const ORIGIN = 'http://localhost:5000';
@@ -163,13 +163,36 @@ describe('countRedacted', () => {
   });
 });
 
-describe('replayPath', () => {
-  it('keeps replays on the dashboard origin', () => {
-    expect(replayPath('/api/orders?x=1')).toBe('/api/orders?x=1');
-    expect(replayPath('api/orders')).toBe('/api/orders');
-    expect(replayPath('//other.test/a?b=1')).toBe('/a?b=1');
-    expect(replayPath('https://other.test/a?b=1')).toBe('/a?b=1');
-    expect(replayPath('')).toBe('/');
+describe('replayUrl', () => {
+  it('resolves normal paths against the dashboard origin', () => {
+    expect(replayUrl('/api/orders?id=1', ORIGIN)).toBe(`${ORIGIN}/api/orders?id=1`);
+    expect(replayUrl('api/orders', ORIGIN)).toBe(`${ORIGIN}/api/orders`);
+    expect(replayUrl(`${ORIGIN}/api/orders#top`, ORIGIN)).toBe(`${ORIGIN}/api/orders`);
+  });
+
+  it('rejects anything that leaves the origin', () => {
+    expect(replayUrl('/\\evil.com/x', ORIGIN)).toBeNull();
+    expect(replayUrl('\\\\evil.com', ORIGIN)).toBeNull();
+    expect(replayUrl('//evil.com/x', ORIGIN)).toBeNull();
+    expect(replayUrl('https://evil.com/x', ORIGIN)).toBeNull();
+    expect(replayUrl('http://localhost:5001/x', ORIGIN)).toBeNull();
+  });
+
+  it('rejects tabs, newlines and other control characters', () => {
+    expect(replayUrl('/api/\torders', ORIGIN)).toBeNull();
+    expect(replayUrl('/api/orders\n', ORIGIN)).toBeNull();
+    expect(replayUrl('/\n/evil.com/x', ORIGIN)).toBeNull();
+    expect(replayUrl('/api/\u007forders', ORIGIN)).toBeNull();
+  });
+
+  it('keeps an encoded backslash as a literal path on the same origin', () => {
+    expect(replayUrl('/%5Cevil.com', ORIGIN)).toBe(`${ORIGIN}/%5Cevil.com`);
+  });
+
+  it('returns an absolute URL, so a path that normalizes to // stays on the origin', () => {
+    const url = replayUrl('/.//evil.com/x', ORIGIN)!;
+    expect(new URL(url).origin).toBe(ORIGIN);
+    expect(new URL(url, 'https://elsewhere.test').origin).toBe(ORIGIN);
   });
 });
 
