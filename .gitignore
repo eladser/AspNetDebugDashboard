@@ -337,3 +337,5 @@ yarn.lock
 
 # Debug Dashboard specific
 debug-dashboard.db
+
+TestResults/
