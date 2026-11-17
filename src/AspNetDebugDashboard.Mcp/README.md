@@ -35,7 +35,7 @@ Point your MCP client at the `aspnet-debug-mcp` command. For Claude Desktop / Cl
 
 - `get_stats`: counts, averages, distributions, slowest requests and queries
 - `recent_requests`: newest requests, optionally failed-only
-- `get_request`: one request in full, with its SQL and logs
+- `get_request`: one request in full, with its SQL, outgoing calls, logs, and dumps. Each of those has `startOffsetMs` from the start of the request (SQL and HTTP also have `durationMs`), so the agent can see where the time went
 - `recent_queries`: newest SQL, optionally slow-only
 - `recent_exceptions`: newest unhandled exceptions with stack traces
 - `recent_logs`: newest logs, optionally by level
