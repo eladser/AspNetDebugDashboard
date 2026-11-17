@@ -53,7 +53,7 @@ public class DebugRequestMiddleware
             if (_config.LogResponseBodies)
             {
                 var originalBodyStream = context.Response.Body;
-                var capture = new CaptureStream(originalBodyStream, context.Response);
+                var capture = new CaptureStream(originalBodyStream, context.Response, _config.MaxBodySize);
                 context.Response.Body = capture;
 
                 try
@@ -66,7 +66,7 @@ public class DebugRequestMiddleware
                 }
 
                 elapsed = Stopwatch.GetElapsedTime(start);
-                responseBody = await ReadResponseBodyAsync(capture, originalBodyStream);
+                responseBody = await ReadResponseBodyAsync(capture, originalBodyStream, context.Response.ContentType);
             }
             else
             {
@@ -134,15 +134,18 @@ public class DebugRequestMiddleware
         }
     }
 
-    private async Task<string> ReadResponseBodyAsync(CaptureStream capture, Stream originalBodyStream)
+    private async Task<string> ReadResponseBodyAsync(CaptureStream capture, Stream originalBodyStream, string? contentType)
     {
+        if (capture.Streaming) return "";
+        if (capture.Overflowed) return $"[Body too large: {capture.Total} bytes]";
+
         var buffer = capture.Buffer;
         string text;
         try
         {
-            text = buffer.Length > _config.MaxBodySize
-                ? $"[Body too large: {buffer.Length} bytes]"
-                : Encoding.UTF8.GetString(buffer.GetBuffer(), 0, (int)buffer.Length);
+            text = IsTextual(contentType)
+                ? Encoding.UTF8.GetString(buffer.GetBuffer(), 0, (int)buffer.Length)
+                : $"[Binary body: {buffer.Length} bytes, {contentType!.Split(';')[0].Trim()}]";
         }
         catch (Exception ex)
         {
@@ -156,25 +159,61 @@ public class DebugRequestMiddleware
         return text;
     }
 
-    // Buffers the response, except event streams: those have to reach the client as they're written.
+    private static bool IsTextual(string? contentType)
+    {
+        if (string.IsNullOrWhiteSpace(contentType)) return true;
+
+        var type = contentType.Split(';')[0].Trim().ToLowerInvariant();
+        return type.StartsWith("text/")
+            || type is "application/json" or "application/xml" or "application/javascript" or "application/x-www-form-urlencoded"
+            || type.StartsWith("application/") && (type.EndsWith("+json") || type.EndsWith("+xml"));
+    }
+
+    // Buffers the response up to MaxBodySize. Past that, and for event streams, writes go
+    // straight to the client so big downloads and live streams aren't held in memory.
     private sealed class CaptureStream : Stream
     {
         private readonly Stream _original;
         private readonly HttpResponse _response;
-        private Stream? _target;
+        private readonly int _max;
+        private bool? _streaming;
 
         public MemoryStream Buffer { get; } = new();
+        public bool Overflowed { get; private set; }
+        public long Total { get; private set; }
+        public bool Streaming => _streaming == true;
 
-        public CaptureStream(Stream original, HttpResponse response)
+        public CaptureStream(Stream original, HttpResponse response, int max)
         {
             _original = original;
             _response = response;
+            _max = max;
         }
 
-        private Stream Target => _target ??=
-            _response.ContentType?.StartsWith("text/event-stream", StringComparison.OrdinalIgnoreCase) == true
-                ? _original
-                : Buffer;
+        private bool Direct
+        {
+            get
+            {
+                _streaming ??= _response.ContentType?.StartsWith("text/event-stream", StringComparison.OrdinalIgnoreCase) == true;
+                return _streaming == true || Overflowed;
+            }
+        }
+
+        private bool WouldOverflow(int count) => !Direct && Buffer.Length + count > _max;
+
+        private void Spill()
+        {
+            Overflowed = true;
+            _original.Write(Buffer.GetBuffer(), 0, (int)Buffer.Length);
+            Buffer.SetLength(0);
+        }
+
+        private async Task SpillAsync(CancellationToken ct)
+        {
+            Overflowed = true;
+            await _original.WriteAsync(Buffer.GetBuffer().AsMemory(0, (int)Buffer.Length), ct);
+            Buffer.SetLength(0);
+        }
 
         public override bool CanRead => false;
         public override bool CanSeek => false;
@@ -182,15 +221,32 @@ public class DebugRequestMiddleware
         public override long Length => throw new NotSupportedException();
         public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
 
-        public override void Flush() => Target.Flush();
-        public override Task FlushAsync(CancellationToken ct) => Target.FlushAsync(ct);
+        public override void Flush() { if (Direct) _original.Flush(); }
+        public override Task FlushAsync(CancellationToken ct) => Direct ? _original.FlushAsync(ct) : Task.CompletedTask;
         public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
         public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
         public override void SetLength(long value) => throw new NotSupportedException();
-        public override void Write(byte[] buffer, int offset, int count) => Target.Write(buffer, offset, count);
-        public override void Write(ReadOnlySpan<byte> buffer) => Target.Write(buffer);
-        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken ct) => Target.WriteAsync(buffer, offset, count, ct);
-        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken ct = default) => Target.WriteAsync(buffer, ct);
+
+        public override void Write(byte[] buffer, int offset, int count) => Write(buffer.AsSpan(offset, count));
+
+        public override void Write(ReadOnlySpan<byte> buffer)
+        {
+            Total += buffer.Length;
+            if (WouldOverflow(buffer.Length)) Spill();
+            if (Direct) _original.Write(buffer);
+            else Buffer.Write(buffer);
+        }
+
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken ct) =>
+            WriteAsync(buffer.AsMemory(offset, count), ct).AsTask();
+
+        public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken ct = default)
+        {
+            Total += buffer.Length;
+            if (WouldOverflow(buffer.Length)) await SpillAsync(ct);
+            if (Direct) await _original.WriteAsync(buffer, ct);
+            else await Buffer.WriteAsync(buffer, ct);
+        }
     }
 
     private async Task LogRequestAsync(HttpContext context, string requestId, string requestBody, string responseBody, TimeSpan elapsed, Exception? exception = null)

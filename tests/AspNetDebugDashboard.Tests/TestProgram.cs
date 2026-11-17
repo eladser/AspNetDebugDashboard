@@ -148,6 +148,19 @@ app.MapGet("/test-timeline-sync", async context =>
     await context.Response.WriteAsync("ok");
 });
 
+app.MapGet("/test-timeline-slow", async context =>
+{
+    var (conn, db) = NewDb(context);
+    using (conn)
+    await using (db)
+    {
+        conn.CreateFunction("nap", (long ms) => { Thread.Sleep((int)ms); return 1L; });
+        await db.Database.ExecuteSqlRawAsync("select 1");
+        await db.Database.ExecuteSqlRawAsync("select nap(250)");
+    }
+    await context.Response.WriteAsync("ok");
+});
+
 app.MapGet("/test-timeline-fail", async context =>
 {
     var (conn, db) = NewDb(context);

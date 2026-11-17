@@ -123,6 +123,22 @@ public class TimelineCaptureTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SqlOffset_IsWhenTheCommandStarted_NotWhenItEnded()
+    {
+        var req = await RunAsync("/test-timeline-slow");
+
+        var fast = req.SqlQueries.Single(q => q.Query.Contains("select 1"));
+        var slow = req.SqlQueries.Single(q => q.Query.Contains("nap(250)"));
+        var total = req.DurationMs!.Value;
+
+        slow.DurationMs.Should().BeGreaterThanOrEqualTo(240);
+        slow.StartOffsetMs.Should().BeGreaterThanOrEqualTo(End(fast.StartOffsetMs, fast.DurationMs) - 5);
+        // measured at the end, the offset would sit right at the request's end
+        slow.StartOffsetMs.Should().BeLessThan(total - slow.DurationMs!.Value * 0.8);
+        End(slow.StartOffsetMs, slow.DurationMs).Should().BeLessThanOrEqualTo(total + 5);
+    }
+
+    [Fact]
     public async Task FailedSqlCommands_GetOffsets()
     {
         var req = await RunAsync("/test-timeline-fail");

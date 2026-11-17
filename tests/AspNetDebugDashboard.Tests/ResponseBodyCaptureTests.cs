@@ -15,7 +15,7 @@ namespace AspNetDebugDashboard.Tests;
 
 public class ResponseBodyCaptureTests
 {
-    private static async Task<IHost> StartAsync(Action<IApplicationBuilder> pipeline)
+    private static async Task<IHost> StartAsync(Action<IApplicationBuilder> pipeline, int? maxBodySize = null)
     {
         var host = await new HostBuilder()
             .ConfigureWebHost(web => web
@@ -26,6 +26,7 @@ public class ResponseBodyCaptureTests
                     {
                         o.DatabasePath = $":memory:{Guid.NewGuid()}";
                         o.LogResponseBodies = true;
+                        if (maxBodySize is int m) o.MaxBodySize = m;
                     });
                 })
                 .Configure(app =>
@@ -72,6 +73,81 @@ public class ResponseBodyCaptureTests
         bytes.Length.Should().Be(size);
         bytes[1000].Should().Be((byte)(1000 % 251));
         (await StoredAsync(host)).ResponseBody.Should().StartWith("[Body too large");
+    }
+
+    [Fact]
+    public async Task LargeResponse_ReachesTheClientWhileTheEndpointIsStillWriting()
+    {
+        var release = new TaskCompletionSource();
+        var chunk = new byte[64 * 1024];
+        Array.Fill(chunk, (byte)'a');
+        using var host = await StartAsync(app => app.Run(async ctx =>
+        {
+            ctx.Response.ContentType = "text/plain";
+            for (var i = 0; i < 16; i++) await ctx.Response.Body.WriteAsync(chunk);
+            await release.Task;
+            for (var i = 0; i < 16; i++) await ctx.Response.Body.WriteAsync(chunk);
+        }), maxBodySize: 64 * 1024);
+
+        try
+        {
+            var get = host.GetTestClient().GetAsync("/dl", HttpCompletionOption.ResponseHeadersRead);
+            var done = await Task.WhenAny(get, Task.Delay(TimeSpan.FromSeconds(5)));
+            done.Should().BeSameAs(get, "bytes past MaxBodySize have to be passed through, not held back");
+
+            using var res = await get;
+            var stream = await res.Content.ReadAsStreamAsync();
+            var first = new byte[1024];
+            (await stream.ReadAsync(first)).Should().BeGreaterThan(0);
+
+            release.SetResult();
+            using var rest = new MemoryStream();
+            await stream.CopyToAsync(rest);
+            (rest.Length + first.Length).Should().BeGreaterThanOrEqualTo(2 * 1024 * 1024 - 1024);
+        }
+        finally
+        {
+            release.TrySetResult();
+        }
+
+        var req = await StoredAsync(host);
+        req.ResponseBody.Should().StartWith("[Body too large");
+        req.ResponseBody.Should().Contain((2 * 1024 * 1024).ToString());
+    }
+
+    [Theory]
+    [InlineData("image/png")]
+    [InlineData("application/octet-stream")]
+    public async Task BinaryResponseUnderMaxBodySize_IsStoredAsAPlaceholder(string type)
+    {
+        var payload = Enumerable.Range(0, 1000).Select(i => (byte)(0x80 + i % 100)).ToArray();
+        using var host = await StartAsync(app => app.Run(async ctx =>
+        {
+            ctx.Response.ContentType = type;
+            await ctx.Response.Body.WriteAsync(payload);
+        }));
+
+        var bytes = await host.GetTestClient().GetByteArrayAsync("/bin");
+
+        bytes.Should().Equal(payload);
+        (await StoredAsync(host)).ResponseBody.Should().Be($"[Binary body: 1000 bytes, {type}]");
+    }
+
+    [Theory]
+    [InlineData("application/json")]
+    [InlineData("application/problem+json")]
+    [InlineData("text/html; charset=utf-8")]
+    public async Task TextLikeResponse_IsStoredAsText(string type)
+    {
+        using var host = await StartAsync(app => app.Run(async ctx =>
+        {
+            ctx.Response.ContentType = type;
+            await ctx.Response.WriteAsync("{\"a\":1}");
+        }));
+
+        await host.GetTestClient().GetAsync("/t");
+
+        (await StoredAsync(host)).ResponseBody.Should().Be("{\"a\":1}");
     }
 
     [Fact]
