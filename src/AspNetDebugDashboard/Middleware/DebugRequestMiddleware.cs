@@ -200,7 +200,7 @@ public class DebugRequestMiddleware
             
             foreach (var header in context.Request.Headers)
             {
-                if (!_config.ExcludedHeaders.Contains(header.Key, StringComparer.OrdinalIgnoreCase))
+                if (!_config.ExcludedHeaders.Contains(header.Key, StringComparer.OrdinalIgnoreCase) && !ReplayMarker.IsHeader(header.Key))
                 {
                     headers[header.Key] = string.Join(", ", header.Value.ToArray());
                 }
@@ -227,6 +227,7 @@ public class DebugRequestMiddleware
                 Url = $"{request.Scheme}://{request.Host}{request.Path}{request.QueryString}",
                 Protocol = request.Protocol,
                 IsHttps = request.IsHttps,
+                ReplayOf = ReplayMarker.Read(request),
                 Headers = headers,
                 RequestBody = requestBody,
                 ResponseBody = responseBody,

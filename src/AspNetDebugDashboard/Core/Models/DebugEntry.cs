@@ -38,6 +38,7 @@ public class RequestEntry : DebugEntry
     public long ResponseSize { get; set; }
     public string? Protocol { get; set; }
     public bool IsHttps { get; set; }
+    public string? ReplayOf { get; set; }
 }
 
 public class SqlQueryEntry : DebugEntry
