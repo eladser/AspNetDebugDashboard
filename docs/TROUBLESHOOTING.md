@@ -78,6 +78,28 @@ You should see `retry: 5000` at once, then an `event: entry` line whenever somet
 
 Entries are correlated by `HttpContext.TraceIdentifier` while the request is in flight. Work done outside a request (background services, startup seeding, hosted jobs) is still captured, but lands unattached, so you'll see it in the Queries/Logs tabs with no parent request link.
 
+## The Timeline tab is missing or a bar looks wrong
+
+- The tab only shows when at least one SQL query, outgoing call, log, or dump in the request has a start offset. Requests captured before 2.5 have none, and neither do requests that didn't run anything the dashboard captures. Those open on Summary.
+- Offsets are only recorded while the request is in flight. Something that finishes after the request was recorded (fire-and-forget work, say) gets no offset and isn't drawn.
+- SQL bars show command time. For a query that returns rows, the bar ends when EF Core gets the data reader back; reading the rows into entities happens after that and isn't part of it. A query that returns a lot of rows can have a short bar and a gap after it.
+- Outgoing HTTP bars end when the response headers arrive. `HttpClient` reads the body after that, so a large download takes longer than its bar shows.
+- Logs and dumps are points in time and show as ticks. An unhandled exception is drawn at the end of the request, since there's no offset for it.
+- With more than 300 entries, the first 300 are drawn and a "show all" link renders the rest.
+
+## Replay doesn't match the original request
+
+Replay rebuilds the request from what was captured and sends it with `fetch()` from the dashboard page, to the dashboard's own origin. Some things don't survive that:
+
+- **Antiforgery tokens.** `RedactedBodyFields` matches field names by substring, so the default `token` entry also covers `__RequestVerificationToken`. It's stored as `***`, and a Razor Pages or MVC form post replayed as-is returns 400. Paste a fresh token from the page before sending.
+- **Headers that weren't stored.** Anything in `ExcludedHeaders` (`Authorization`, `Cookie`, `X-Api-Key`, and the others) was dropped at capture time, so the replay goes out without it. Add the ones you need back in the headers box. Cookies can't be set there; they come from your browser, since the replay is a same-origin request.
+- **Headers the browser sets itself.** `fetch()` can't send `Host`, `Content-Length`, `Origin`, `Referer`, `Accept-Encoding`, `Sec-*`, `Proxy-*`, and the rest of the [forbidden names](https://fetch.spec.whatwg.org/#forbidden-request-header). They're left out, and the panel lists them.
+- **Bodies.** Multipart (file uploads) and other binary bodies can't be rebuilt from the captured text, so they aren't resent. Neither are bodies that weren't captured (`LogRequestBodies` off, or over `MaxBodySize`). GET and HEAD never send one.
+- **Redirects.** The replay doesn't follow them. A 302 is the result, and the recorded entry shows it.
+- **Another origin.** If the request was captured on a different host or port than the one the dashboard is open on, the replay still goes to the dashboard's origin. The panel warns about it.
+- **`PathBase`.** Apps that run under a `PathBase` aren't supported, same as the rest of the dashboard.
+- **"Not recorded".** After sending, the panel waits 5 seconds for the replayed request to be stored. A path in `ExcludedPaths`, a static file, or a route the dashboard doesn't see never shows up, so you get "Not recorded" along with the response status.
+
 ## The database file is corrupt or won't open
 
 LiteDB writes a WAL file next to the database: `debug-dashboard-log.db`. Two rules:
