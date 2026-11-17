@@ -46,3 +46,5 @@ public class OrderItem
     public int Quantity { get; set; }
     public decimal UnitPrice { get; set; }
 }
+
+public record ShippingRates(decimal Standard, decimal Express);
