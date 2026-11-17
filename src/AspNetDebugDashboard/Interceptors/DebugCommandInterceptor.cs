@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using System.Data.Common;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Http;
 
@@ -25,14 +26,14 @@ public class DebugCommandInterceptor : DbCommandInterceptor
         DbCommand command, CommandExecutedEventData eventData, DbDataReader result,
         CancellationToken cancellationToken = default)
     {
-        await LogAsync(command, eventData.Duration, true, null, null);
+        Log(command, eventData.Duration, true, null, null);
         return await base.ReaderExecutedAsync(command, eventData, result, cancellationToken);
     }
 
     public override DbDataReader ReaderExecuted(
         DbCommand command, CommandExecutedEventData eventData, DbDataReader result)
     {
-        LogFireAndForget(command, eventData.Duration, true, null, null);
+        Log(command, eventData.Duration, true, null, null);
         return base.ReaderExecuted(command, eventData, result);
     }
 
@@ -40,14 +41,14 @@ public class DebugCommandInterceptor : DbCommandInterceptor
         DbCommand command, CommandExecutedEventData eventData, int result,
         CancellationToken cancellationToken = default)
     {
-        await LogAsync(command, eventData.Duration, true, null, result);
+        Log(command, eventData.Duration, true, null, result);
         return await base.NonQueryExecutedAsync(command, eventData, result, cancellationToken);
     }
 
     public override int NonQueryExecuted(
         DbCommand command, CommandExecutedEventData eventData, int result)
     {
-        LogFireAndForget(command, eventData.Duration, true, null, result);
+        Log(command, eventData.Duration, true, null, result);
         return base.NonQueryExecuted(command, eventData, result);
     }
 
@@ -55,42 +56,43 @@ public class DebugCommandInterceptor : DbCommandInterceptor
         DbCommand command, CommandExecutedEventData eventData, object? result,
         CancellationToken cancellationToken = default)
     {
-        await LogAsync(command, eventData.Duration, true, null, null);
+        Log(command, eventData.Duration, true, null, null);
         return await base.ScalarExecutedAsync(command, eventData, result, cancellationToken);
     }
 
     public override object? ScalarExecuted(
         DbCommand command, CommandExecutedEventData eventData, object? result)
     {
-        LogFireAndForget(command, eventData.Duration, true, null, null);
+        Log(command, eventData.Duration, true, null, null);
         return base.ScalarExecuted(command, eventData, result);
     }
 
     public override async Task CommandFailedAsync(
         DbCommand command, CommandErrorEventData eventData, CancellationToken cancellationToken = default)
     {
-        await LogAsync(command, eventData.Duration, false, eventData.Exception?.Message, null);
+        Log(command, eventData.Duration, false, eventData.Exception?.Message, null);
         await base.CommandFailedAsync(command, eventData, cancellationToken);
     }
 
     public override void CommandFailed(DbCommand command, CommandErrorEventData eventData)
     {
-        LogFireAndForget(command, eventData.Duration, false, eventData.Exception?.Message, null);
+        Log(command, eventData.Duration, false, eventData.Exception?.Message, null);
         base.CommandFailed(command, eventData);
     }
 
-    private void LogFireAndForget(DbCommand command, TimeSpan duration, bool success, string? error, int? rowsAffected)
+    // Attach synchronously so the entry is on the request before it completes; the
+    // storage write runs in the background and never holds up the app's command.
+    private void Log(DbCommand command, TimeSpan duration, bool success, string? error, int? rowsAffected)
     {
         var entry = BuildEntry(command, duration, success, error, rowsAffected);
         if (entry == null) return;
-        _ = Task.Run(() => StoreAsync(entry));
-    }
 
-    private async Task LogAsync(DbCommand command, TimeSpan duration, bool success, string? error, int? rowsAffected)
-    {
-        var entry = BuildEntry(command, duration, success, error, rowsAffected);
-        if (entry == null) return;
-        await StoreAsync(entry);
+        if (!string.IsNullOrEmpty(entry.RequestId))
+        {
+            _serviceProvider.GetService<DebugContext>()?.AddSqlQuery(entry.RequestId, entry);
+        }
+
+        _ = Task.Run(() => StoreAsync(entry));
     }
 
     // Snapshot everything we need from the DbCommand synchronously, since it may be
@@ -107,11 +109,16 @@ public class DebugCommandInterceptor : DbCommandInterceptor
         var requestId = httpContextAccessor?.HttpContext?.TraceIdentifier;
         var ms = (long)duration.TotalMilliseconds;
 
+        // EF reports the callback after the command ran, so the start is now minus its duration
+        var offset = _serviceProvider.GetService<DebugContext>()?.OffsetMs(DebugContext.Current.Value);
+
         return new SqlQueryEntry
         {
             Query = command.CommandText,
             Parameters = GetParameters(command),
             ExecutionTimeMs = ms,
+            DurationMs = DebugContext.RoundMs(duration.TotalMilliseconds),
+            StartOffsetMs = offset is double o ? DebugContext.RoundMs(o - duration.TotalMilliseconds) : null,
             RowsAffected = rowsAffected ?? 0,
             RequestId = requestId ?? string.Empty,
             Database = command.Connection?.Database,
@@ -130,19 +137,16 @@ public class DebugCommandInterceptor : DbCommandInterceptor
 
             await storage.StoreSqlQueryAsync(entry);
 
-            if (!string.IsNullOrEmpty(entry.RequestId))
-            {
-                _serviceProvider.GetService<DebugContext>()?.AddSqlQuery(entry.RequestId, entry);
-            }
-
             if (_serviceProvider.GetService<IOptions<DebugConfiguration>>()?.Value.EmitActivities == true)
             {
                 DebugTelemetry.RecordQuery(entry);
             }
         }
-        catch
+        catch (Exception ex)
         {
             // a failure to record a query must never take the app down with it
+            _serviceProvider.GetService<ILoggerFactory>()?.CreateLogger<DebugCommandInterceptor>()
+                .LogWarning(ex, "Could not store SQL query");
         }
     }
 
