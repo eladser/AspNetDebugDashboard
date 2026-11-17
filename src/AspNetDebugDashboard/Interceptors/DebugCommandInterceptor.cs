@@ -92,7 +92,14 @@ public class DebugCommandInterceptor : DbCommandInterceptor
             _serviceProvider.GetService<DebugContext>()?.AddSqlQuery(entry.RequestId, entry);
         }
 
-        _ = Task.Run(() => StoreAsync(entry));
+        // The scope behind _serviceProvider can be gone by the time the background work
+        // runs (last query of a request, host shutdown), so resolve everything up front.
+        var storage = _serviceProvider.GetService<IDebugStorage>();
+        if (storage == null) return;
+        var logger = _serviceProvider.GetService<ILoggerFactory>()?.CreateLogger<DebugCommandInterceptor>();
+        var emit = _serviceProvider.GetService<IOptions<DebugConfiguration>>()?.Value.EmitActivities == true;
+
+        _ = Task.Run(() => StoreAsync(storage, logger, emit, entry));
     }
 
     // Snapshot everything we need from the DbCommand synchronously, since it may be
@@ -128,25 +135,19 @@ public class DebugCommandInterceptor : DbCommandInterceptor
         };
     }
 
-    private async Task StoreAsync(SqlQueryEntry entry)
+    private static async Task StoreAsync(IDebugStorage storage, ILogger? logger, bool emit, SqlQueryEntry entry)
     {
         try
         {
-            var storage = _serviceProvider.GetService<IDebugStorage>();
-            if (storage == null) return;
-
             await storage.StoreSqlQueryAsync(entry);
 
-            if (_serviceProvider.GetService<IOptions<DebugConfiguration>>()?.Value.EmitActivities == true)
-            {
-                DebugTelemetry.RecordQuery(entry);
-            }
+            if (emit) DebugTelemetry.RecordQuery(entry);
         }
         catch (Exception ex)
         {
             // a failure to record a query must never take the app down with it
-            _serviceProvider.GetService<ILoggerFactory>()?.CreateLogger<DebugCommandInterceptor>()
-                .LogWarning(ex, "Could not store SQL query");
+            try { logger?.LogWarning(ex, "Could not store SQL query"); }
+            catch { }
         }
     }
 
