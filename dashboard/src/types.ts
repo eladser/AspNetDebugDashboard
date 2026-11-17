@@ -34,6 +34,7 @@ export interface RequestEntry extends EntryBase {
   responseSize: number;
   protocol?: string | null;
   isHttps: boolean;
+  replayOf?: string | null;
 }
 
 export interface SqlQueryEntry extends EntryBase {
@@ -158,6 +159,7 @@ export interface ListQuery {
   isSlowQuery?: boolean;
   minExecutionTime?: number;
   requestId?: string;
+  replayOf?: string;
   host?: string;
 }
 

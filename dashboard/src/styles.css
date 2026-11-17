@@ -988,6 +988,92 @@ pre.code {
 
 .link-btn:hover { text-decoration: underline; }
 
+/* replay */
+.replay-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.replay-path { flex: 1; width: auto; font-family: var(--mono); }
+
+.replay-send { color: var(--accent); border-color: rgba(65, 200, 173, 0.35); white-space: nowrap; }
+.replay-send:hover { color: var(--accent); border-color: var(--accent); }
+.replay-send:disabled { opacity: 0.4; cursor: default; }
+
+.replay-text {
+  display: block;
+  width: 100%;
+  margin-bottom: 16px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--inset);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  resize: vertical;
+  outline: none;
+}
+
+.replay-text:focus { border-color: var(--accent); }
+.replay-text:disabled { color: var(--faint); cursor: not-allowed; }
+.replay-text::placeholder { color: var(--faint); }
+
+.replay-notes {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.replay-notes .warn { color: var(--warn); }
+.replay-notes .err { color: var(--err); }
+
+.replay-result {
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  font-size: 12px;
+}
+
+.replay-result .title { color: var(--text); font-weight: 600; margin-bottom: 3px; }
+.replay-result .err { color: var(--err); font-family: var(--mono); margin-top: 4px; }
+
+.replay-compare {
+  display: grid;
+  grid-template-columns: 110px 1fr 1fr 1fr;
+  gap: 4px 12px;
+  font-family: var(--mono);
+  margin-bottom: 8px;
+}
+
+.delta.better { color: var(--ok); }
+.delta.worse { color: var(--err); }
+.delta.changed { color: var(--warn); }
+.delta.same { color: var(--faint); }
+
+.replay-mark {
+  margin-left: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--accent);
+  background: var(--accent-dim);
+  border: 0;
+  border-radius: 4px;
+  padding: 0 5px;
+  cursor: pointer;
+  vertical-align: 1px;
+}
+
+.replay-mark:hover { text-decoration: underline; }
+
 /* perf endpoint table reuse */
 .bar-cell { display: flex; align-items: center; gap: 8px; }
 .bar-cell .track {

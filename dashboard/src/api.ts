@@ -43,6 +43,7 @@ function listUrl(resource: string, q: ListQuery): string {
   if (q.isSlowQuery !== undefined) p.set('isSlowQuery', String(q.isSlowQuery));
   if (q.minExecutionTime !== undefined) p.set('minExecutionTime', String(q.minExecutionTime));
   if (q.requestId) p.set('requestId', q.requestId);
+  if (q.replayOf) p.set('replayOf', q.replayOf);
   if (q.host) p.set('host', q.host);
   return `${apiBase}/${resource}?${p}`;
 }
