@@ -2,7 +2,7 @@
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versions follow [SemVer](https://semver.org).
 
-## [2.5.0] - 2026-11-XX
+## [2.5.0] - 2026-11-17
 
 No new options and no setup changes. Entries stored by earlier versions load as they are; they have no timing offsets, so their detail opens on Summary.
 
