@@ -322,7 +322,7 @@ curl http://localhost:5000/api/externalapi/zen     # outgoing call to api.github
 curl http://localhost:5000/api/orders/report       # N+1 queries and a slow outgoing call
 ```
 
-`POST /api/orders` calls `DebugDump.Dump` on the order it creates. `GET /api/orders/report` loads each order's items with a separate query and then calls a local endpoint that takes 300 ms; open it on the Timeline, then replay it with `?batched=true` for the version that loads the items in one query and reuses the last result of that call. The demo gif above is recorded against this app by [docs/capture-demo.mjs](docs/capture-demo.mjs).
+`POST /api/orders` calls `DebugDump.Dump` on the order it creates. `GET /api/orders/report` loads each order's items with a separate query and then calls a local endpoint that takes 300 ms; open it on the Timeline, then replay it with `?batched=true` for the version that loads the items in one query and reuses the last result of that call. The sample adds about 4 ms to every SQL command ([LatencyInterceptor](samples/SampleApp/Data/LatencyInterceptor.cs)) so SQLite, which runs in-process, behaves like a database server over the network; that time comes from the sample, not the dashboard. The demo gif above is recorded against this app by [docs/capture-demo.mjs](docs/capture-demo.mjs).
 
 ## How the dashboard is built
 

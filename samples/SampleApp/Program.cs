@@ -40,6 +40,7 @@ builder.Services.AddDebugDashboard(config =>
 builder.Services.AddDbContext<SampleDbContext>((sp, options) =>
 {
     options.UseSqlite("Data Source=sample.db");
+    options.AddInterceptors(new LatencyInterceptor());
     options.AddDebugDashboard(sp);
 });
 
